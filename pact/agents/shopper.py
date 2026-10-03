@@ -82,9 +82,7 @@ class ShopperAgent(Agent):
             await self.room.post(self.name, f"@{MERCHANT} Can't confirm: {agreement.reason}",
                                  agreement, [MERCHANT])
             return
-        text = (f"@{MERCHANT} Confirmed on my side. This purchase needs my human's sign-off — "
-                f"pausing for approval." if agreement.human_approval_required
-                else f"@{MERCHANT} Confirmed. Within my autonomous authority — proceeding.")
-        await self.room.post(self.name, text, agreement, [MERCHANT])
-        await self.pause(0.3)  # let the room message land before the approval gate
-        self.on_agreement(agreement)
+        await self.room.post(self.name, f"@{MERCHANT} Confirmed on my side. Sending the agreement for "
+                                        f"authority check before anything executes.", agreement, [MERCHANT])
+        await self.pause(0.3)  # let the room message land before the authority gate
+        await self.on_agreement(agreement)

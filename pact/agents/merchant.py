@@ -29,7 +29,7 @@ class MerchantAgent(Agent):
         elif isinstance(payload, ConditionalAccept):
             await self._on_conditional(payload)
         elif isinstance(payload, Agreement):
-            self.think("Shopper confirmed; holding reservation until human approval")
+            self.think("Shopper confirmed; unit held pending authority check")
 
     async def _on_proposal(self, p: Proposal) -> None:
         self.tool(f"get_inventory() → {self.tools.get_inventory()}")

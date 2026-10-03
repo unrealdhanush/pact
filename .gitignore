@@ -27,3 +27,7 @@ htmlcov/
 
 # Logs
 *.log
+.local/
+
+# Editor local-history backups (contain .env copies!)
+.history/

@@ -73,6 +73,12 @@
   .why { text-align: left; margin: 12px auto 0; max-width: 560px; padding: 0 0 0 20px; color: #c7ced8; font-size: 15px; }
   .why li { margin: 4px 0; }
   .muted { color: var(--muted); }
+  .gate { margin: 4px auto 16px; max-width: 460px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; text-align: left; animation: in .35s ease; }
+  .gate .gh { display: flex; justify-content: space-between; align-items: baseline; font: 600 12px var(--mono); letter-spacing: .12em; color: var(--muted); margin-bottom: 8px; }
+  .gate .row { display: flex; justify-content: space-between; font-size: 17px; padding: 3px 0; }
+  .gate .verdict { margin-top: 8px; font-size: 20px; font-weight: 800; letter-spacing: .04em; }
+  .pass { color: var(--ok); } .warn { color: #f6e05e; } .fail { color: #fc8181; }
+  .gate .reason { color: var(--muted); font-size: 14px; margin-top: 2px; }
 
   @keyframes in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(104,211,145,.55); } 70% { box-shadow: 0 0 0 18px rgba(104,211,145,0); } 100% { box-shadow: 0 0 0 0 rgba(104,211,145,0); } }
@@ -83,7 +89,7 @@
 <header>
   <div class="brand">PACT</div>
   <div class="tag">Set the bounds. Let agents make the deal.</div>
-  <div class="chips"><span class="chip" id="dealId">no deal</span><span class="chip" id="transport">room: —</span></div>
+  <div class="chips"><span class="chip" id="dealId">no deal</span><span class="chip" id="runtime">merchant: —</span><span class="chip" id="transport">room: —</span><span class="chip" id="gateChip">gate: —</span></div>
 </header>
 
 <main>
@@ -164,9 +170,23 @@ function showOffer(o, heading) {
     <div class="terms"><span>${cap(o.variant)}</span><span>${shipLabel(o.shipping)}</span><span>${o.return_window_days}-day returns</span></div>`;
 }
 
+let gate = null;
+const VERDICT = { AUTO_APPROVE: ["AUTO-APPROVED", "pass"], HUMAN_APPROVAL_REQUIRED: ["HUMAN APPROVAL REQUIRED", "warn"], REJECT: ["REJECTED", "fail"] };
+function gateHtml(d) {
+  if (!d) return `<div class="gate"><div class="gh"><span>AUTHORITY CHECK</span><span>checking…</span></div></div>`;
+  const [label, cls] = VERDICT[d.decision];
+  const shopper = d.shopper_policy_ok ? ["PASS", "pass"] : d.decision === "REJECT" ? ["FAIL", "fail"] : ["APPROVAL REQUIRED", "warn"];
+  const src = d.source === "jev" ? `Jev · confidence ${d.confidence}` : "local policy rules";
+  return `<div class="gate"><div class="gh"><span>AUTHORITY CHECK</span><span>${esc(src)}</span></div>
+    <div class="row"><span>Merchant rules</span><b class="${d.merchant_policy_ok ? "pass" : "fail"}">${d.merchant_policy_ok ? "PASS" : "FAIL"}</b></div>
+    <div class="row"><span>Shopper rules</span><b class="${shopper[1]}">${shopper[0]}</b></div>
+    <div class="verdict ${cls}">${label}</div><div class="reason">${esc(d.reason)}</div></div>`;
+}
+
 function showAgreement(a, why) {
   const t = a.terms;
   showOffer(t, "Agreement ready · saves " + money(a.shopper_savings));
+  $("offer").insertAdjacentHTML("beforeend", gateHtml(gate));
   $("offer").insertAdjacentHTML("beforeend",
     `<button class="cta" id="approveBtn">APPROVE ${money(t.price)}</button>
      <div><button class="ghost" id="whyBtn">Why this deal?</button></div><div id="whyBox"></div>`);
@@ -185,6 +205,7 @@ function showComplete(a, exec) {
     <div class="terms" style="margin-top:12px"><span>${money(t.price)}</span><span>${cap(t.variant)}</span>
       <span>${shipLabel(t.shipping)}</span><span>${t.return_window_days}-day returns</span></div>
     <div>Shopper saved <b>${money(a.shopper_savings)}</b> · Merchant kept margin above floor and moved overstock</div>
+    ${gate ? gateHtml(gate) : ""}
     <div class="sim">order ${esc(exec?.order_id || "")} · execution simulated (no real payment)</div>
     <div><button class="ghost" id="whyBtn">Why this deal?</button></div><div id="whyBox"></div>`;
   $("whyBtn").onclick = () => toggleWhy(lastWhy);
@@ -218,12 +239,28 @@ function onTrace(e) {
 }
 
 function onStatus(e) {
+  if (e.status === "authority_check") {
+    pushStep("AGREEMENT", "terms locked");
+    showOffer(e.agreement.terms, "Agreement · authority check");
+    $("offer").insertAdjacentHTML("beforeend", gateHtml(null));
+  }
   if (e.status === "awaiting_approval") {
     lastWhy = e.why || [];
-    pushStep("AGREEMENT", "awaiting you", "final");
+    pushStep("APPROVE?", "your call", "final");
     showAgreement(e.agreement, lastWhy);
   }
+  if (e.status === "rejected") {
+    showOffer(e.agreement.terms, "Blocked by authority check");
+    $("offer").insertAdjacentHTML("beforeend", gateHtml(gate));
+  }
   if (e.status === "complete") showComplete(e.agreement, e.execution);
+}
+
+function onGate(d) {
+  gate = d;
+  $("gateChip").textContent = "gate: " + (d.source === "jev" ? "Jev" : "local rules");
+  $("gateChip").classList.toggle("live", d.source === "jev");
+  pushStep(d.source === "jev" ? "JEV CHECK" : "RULES CHECK", VERDICT[d.decision][0].toLowerCase());
 }
 
 async function start() {
@@ -234,6 +271,9 @@ async function start() {
   $("roomName").textContent = "# " + deal.id;
   $("transport").textContent = "room: " + deal.transport;
   $("transport").classList.toggle("live", !deal.transport.includes("simulated"));
+  $("runtime").textContent = "merchant: " + deal.merchant_runtime;
+  $("runtime").classList.toggle("live", !deal.merchant_runtime.includes("simulated"));
+  gate = null;
   renderRules(deal);
   ladder = [];
   pushStep(money(listPrice), "list price", "struck");
@@ -244,6 +284,7 @@ async function start() {
     if (e.type === "message") onMessage(e.message);
     else if (e.type === "trace") onTrace(e);
     else if (e.type === "status") onStatus(e);
+    else if (e.type === "gate") onGate(e.decision);
   };
 }
 

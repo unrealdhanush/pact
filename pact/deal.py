@@ -1,17 +1,21 @@
 """One negotiation: room + both agents + an event log the UI streams."""
 import asyncio
+import os
 import random
 import time
 from dataclasses import asdict
 from typing import Literal
 
+from . import jev
 from .agents.merchant import MerchantAgent
 from .agents.shopper import ShopperAgent
+from .agents.zoowork_merchant import ZooWorkMerchantAgent
 from .protocol import Agreement, RoomMessage
 from .scenario import MerchantState, Product, ShopperState
 from .transport import LocalRoom
+from .zoowork import load_agent_id
 
-Status = Literal["negotiating", "awaiting_approval", "complete", "failed"]
+Status = Literal["negotiating", "authority_check", "awaiting_approval", "complete", "rejected"]
 
 
 class Deal:
@@ -22,6 +26,7 @@ class Deal:
         self.shopper_state = ShopperState()
         self.merchant_state = MerchantState()
         self.agreement: Agreement | None = None
+        self.decision: jev.JevDecision | None = None
         self.events: list[dict] = []
         self._queues: set[asyncio.Queue] = set()
 
@@ -29,7 +34,14 @@ class Deal:
         self.room.subscribe(self._on_room_message)
         self.shopper = ShopperAgent(self.room, self._trace, self.shopper_state, self.product,
                                     on_agreement=self._on_agreement, pace=pace)
-        self.merchant = MerchantAgent(self.room, self._trace, self.merchant_state, self.product, pace=pace)
+        zoowork_id = load_agent_id() if os.environ.get("PACT_MERCHANT", "zoowork") == "zoowork" else None
+        if zoowork_id:
+            self.merchant = ZooWorkMerchantAgent(self.room, self._trace, self.merchant_state, self.product,
+                                                 agent_id=zoowork_id, pace=pace)
+            self.merchant_runtime = "ZooWork"
+        else:
+            self.merchant = MerchantAgent(self.room, self._trace, self.merchant_state, self.product, pace=pace)
+            self.merchant_runtime = "local (simulated)"
 
     # ------------------------------------------------------------ events
     def emit(self, type_: str, **data) -> None:
@@ -54,16 +66,28 @@ class Deal:
     async def _on_room_message(self, msg: RoomMessage) -> None:
         self.emit("message", message=msg.model_dump(mode="json"))
 
-    def _on_agreement(self, agreement: Agreement) -> None:
+    async def _on_agreement(self, agreement: Agreement) -> None:
         self.agreement = agreement
-        self.status = "awaiting_approval" if agreement.human_approval_required else "complete"
-        self.emit("status", status=self.status, agreement=agreement.model_dump(mode="json"),
-                  why=self.why())
+        self.status = "authority_check"
+        self.emit("status", status=self.status, agreement=agreement.model_dump(mode="json"))
+        transcript = [f"{m.sender}: {m.text}" for m in self.room.history]
+        self.decision = await jev.evaluate(agreement, self.shopper_state, self.merchant_state, transcript)
+        self.emit("gate", decision=self.decision.model_dump())
+        if self.decision.decision == "AUTO_APPROVE":
+            self._execute()
+        elif self.decision.decision == "REJECT":
+            self.status = "rejected"
+            self.emit("status", status=self.status, agreement=agreement.model_dump(mode="json"))
+        else:
+            self.status = "awaiting_approval"
+            self.emit("status", status=self.status, agreement=agreement.model_dump(mode="json"),
+                      why=self.why())
 
     # ------------------------------------------------------------ lifecycle
     def snapshot(self) -> dict:
         return {
             "id": self.id, "status": self.status, "transport": self.room.transport_name,
+            "merchant_runtime": self.merchant_runtime,
             "product": asdict(self.product),
             "shopper": _jsonable(asdict(self.shopper_state)),
             "merchant": _jsonable(asdict(self.merchant_state)),
@@ -74,12 +98,20 @@ class Deal:
         await self.shopper.start()
 
     def why(self) -> list[str]:
-        return [*self.merchant.reasons, *self.shopper.reasons,
-                "Both agents remained within the authority granted by their owners"]
+        out = [*self.merchant.reasons, *self.shopper.reasons]
+        d = self.decision
+        if d and d.decision == "HUMAN_APPROVAL_REQUIRED":
+            who = "Jev" if d.source == "jev" else "The authority gate"
+            out.append(f"{who} blocked automatic execution: {d.reason}")
+        out.append("Both agents remained within the authority granted by their owners")
+        return out
 
     def approve(self) -> dict:
         if self.status != "awaiting_approval" or not self.agreement:
             raise ValueError(f"Deal is {self.status}, not awaiting approval")
+        return self._execute()
+
+    def _execute(self) -> dict:
         terms = self.agreement.terms
         tools = self.merchant.tools
         reservation = tools.reserve_inventory(terms.variant)
