@@ -7,9 +7,10 @@ speaking the protocol below over BAND.
 ## Identity and room
 
 - The shopper speaks as the BAND agent **`ShopperAgent`**; the merchant is **`MerchantAgent`**.
-  Both are registered under Dhanush's BAND account (`python -m pact.band_setup`; creds in `.local/band.json`, never commit it).
+  Both are registered under Dhanush's BAND account; their agent keys live in gitignored `.env.band`
+  (`BAND_SHOPPER_AGENT_KEY`, `BAND_MERCHANT_AGENT_KEY`). Never commit it. `uv run python -m pact.band check` tests them.
 - Each deal is one BAND chat room owned by the human account, with both agents as members.
-  Today the Pact server creates it in `Deal.setup()` (`pact/deal.py`).
+  Today the Pact server creates it in `Deal.setup()` (`pact/deal.py`) via `BandRoom.create`.
 
 ## Message format
 
@@ -24,7 +25,7 @@ BAND messages carry only text and mentions, so every Pact message is:
 ````
 
 - Always @mention the other agent (BAND only routes mentioned messages).
-- The JSON block must validate against the models in `pact/protocol.py`. `encode()`/`decode()` in `pact/band.py` do this.
+- The JSON block must validate against the models in `pact/protocol.py`. `encode_content()`/`decode_content()` in `pact/band.py` do this.
 - Never put private constraints (budget ceiling, thresholds) in the text. Only proposals and terms go into the room.
 
 ## Sequence
@@ -45,7 +46,7 @@ The gate then returns `AUTO_APPROVE` (executes), `HUMAN_APPROVAL_REQUIRED` (UI s
    (`start()`, `handle(payload)`, `self.room.post(...)`, `await self.on_agreement(agreement)`), and BAND,
    ZooWork, Jev and the UI all keep working unchanged.
 2. **Separate process (e.g. BAND SDK / another framework):** connect as `ShopperAgent` with its key from
-   `.local/band.json`, poll or subscribe for messages that mention it, and follow the sequence above.
+   `.env.band`, poll or subscribe for messages that mention it, and follow the sequence above.
    The Pact server still creates the room, runs the merchant and the gate, and mirrors the transcript to the UI.
    **Not wired yet:** the server currently always starts its stand-in shopper, and only shows messages it posted
    itself. This option needs a `PACT_SHOPPER=external` mode (skip the stand-in, watch the BAND room for the

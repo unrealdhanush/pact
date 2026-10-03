@@ -18,7 +18,7 @@ class Agent:
         self.pace = pace
         self.reasons: list[str] = []  # surfaced in "Why this deal?"
         self.last_message: RoomMessage | None = None
-        room.subscribe(self._dispatch, as_participant=self.name)
+        room.subscribe(self._dispatch)
 
     def think(self, text: str) -> None:
         self._trace(self.side, "think", text)

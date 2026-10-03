@@ -109,3 +109,12 @@ async def verify_competitor_price(product: str, retailer: str, claimed: float) -
         CACHE_FILE.parent.mkdir(exist_ok=True)
         CACHE_FILE.write_text(json.dumps(cache, indent=2))
     return check
+
+
+def integration_status() -> dict:
+    cached = _load_cache()
+    if os.environ.get("TAVILY_API_KEY"):
+        return {"name": "Tavily", "mode": "live",
+                "detail": "Verifies the shopper's competitor price live; cached result if Tavily fails"}
+    when = next(iter(cached.values()), {}).get("checked_at", "never")
+    return {"name": "Tavily", "mode": "fallback", "detail": f"No TAVILY_API_KEY — cached competitor data ({when})"}

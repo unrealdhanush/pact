@@ -16,7 +16,7 @@ from . import engine
 from .protocol import Agreement
 from .scenario import MerchantState, ShopperState
 
-JEV_URL = "https://api.typesafe.ai/v1/systemone"
+JEV_BASE_URL = "https://api.typesafe.ai"
 MIN_CONFIDENCE = 0.6
 RISK_THRESHOLD = 0.5
 
@@ -130,8 +130,9 @@ async def evaluate(a: Agreement, s: ShopperState, m: MerchantState, transcript: 
         return rules
     try:
         async with httpx.AsyncClient(timeout=15) as http:
-            res = await http.post(JEV_URL, headers={"Authorization": f"Bearer {key}"}, json={
-                "model": "jev-latest", "state": {"deal": g.model_dump()}, "questions": _questions(transcript),
+            base = os.environ.get("JEV_BASE_URL", JEV_BASE_URL).rstrip("/")
+            res = await http.post(f"{base}/v1/systemone", headers={"Authorization": f"Bearer {key}"}, json={
+                "model": os.environ.get("JEV_MODEL", "jev-latest"), "state": {"deal": g.model_dump()}, "questions": _questions(transcript),
             })
             res.raise_for_status()
             answers = res.json()["answers"]

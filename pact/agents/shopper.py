@@ -90,4 +90,4 @@ class ShopperAgent(Agent):
         await self.room.post(self.name, f"@{MERCHANT} Confirmed on my side. Sending the agreement for "
                                         f"authority check before anything executes.", agreement, [MERCHANT])
         await self.pause(0.3)  # let the room message land before the authority gate
-        await self.on_agreement(agreement)
+        self.on_agreement(agreement)

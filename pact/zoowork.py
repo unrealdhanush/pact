@@ -86,3 +86,14 @@ def load_agent_id() -> str | None:
     if STATE_FILE.exists():
         return json.loads(STATE_FILE.read_text()).get("agent_id")
     return None
+
+
+def integration_status() -> dict:
+    agent_id = load_agent_id()
+    if os.environ.get("PACT_MERCHANT", "zoowork") != "zoowork":
+        return {"name": "ZooWork", "mode": "fallback", "detail": "PACT_MERCHANT=local — deterministic local merchant"}
+    if os.environ.get("ZOOWORK_API_KEY") and agent_id:
+        return {"name": "ZooWork", "mode": "live",
+                "detail": f"Merchant agent {agent_id[:12]}… reasons + calls Pact tools; engine decides terms"}
+    return {"name": "ZooWork", "mode": "fallback",
+            "detail": "No ZooWork agent — run `python -m pact.zoowork_setup`; local merchant (simulated)"}

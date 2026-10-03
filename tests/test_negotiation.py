@@ -23,7 +23,7 @@ async def test_hero_negotiation_price_matches_verified_competitor_and_waits_for_
     t = deal.agreement.terms
     assert (t.price, t.variant, t.shipping, t.return_window_days) == (299.99, "silver", "free_next_day", 45)
     assert deal.agreement.shopper_savings == 30
-    assert deal.decision.decision == "HUMAN_APPROVAL_REQUIRED"
+    assert deal.authority["decision"] == "HUMAN_APPROVAL_REQUIRED"
 
     # Black held at its scarcity floor; silver price-matched to the (cached) Tavily-verified sony.com price.
     counter = next(e["message"]["payload"] for e in deal.events
