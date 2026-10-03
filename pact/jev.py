@@ -145,8 +145,11 @@ async def evaluate(a: Agreement, s: ShopperState, m: MerchantState, transcript: 
     final, reason = rules.decision, rules.reason
     if _SEVERITY[jev_decision] > _SEVERITY[final]:
         final, reason = jev_decision, f"Jev escalated to {jev_decision}"
-    if risk >= RISK_THRESHOLD and _SEVERITY[final] < 1:
-        final, reason = "HUMAN_APPROVAL_REQUIRED", f"Jev flagged risk ({risk:.2f}) in the negotiation"
+    if risk >= RISK_THRESHOLD:
+        if _SEVERITY[final] < 1:
+            final, reason = "HUMAN_APPROVAL_REQUIRED", f"Jev flagged risk ({risk:.2f}) in the negotiation"
+        else:  # still surface it, so the approver sees why to look closely
+            reason += f" · Jev flagged possible manipulation in the transcript (risk {risk:.2f})"
     if confidence < MIN_CONFIDENCE and _SEVERITY[final] < 1:
         final, reason = "HUMAN_APPROVAL_REQUIRED", f"Jev confidence {confidence:.2f} below {MIN_CONFIDENCE}"
     return rules.model_copy(update={"decision": final, "reason": reason, "source": "jev",
