@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://inspection-why-anybody-vehicle.trycloudflare.com/api/:path*"
+      "destination": "https://issn-article-practical-hong.trycloudflare.com/api/:path*"
     }
   ],
   "headers": [
