@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pact</title>
+<style>
+  :root {
+    --bg: #0d0f12; --panel: #15181d; --line: #262b33; --text: #eef0f3; --muted: #8a93a1;
+    --shopper: #4fd1c5; --shopper-dim: rgba(79,209,197,.12);
+    --merchant: #f6ad55; --merchant-dim: rgba(246,173,85,.12);
+    --ok: #68d391; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 20px; padding: 18px 28px; border-bottom: 1px solid var(--line); }
+  .brand { font-size: 30px; font-weight: 800; letter-spacing: .18em; }
+  .tag { color: var(--muted); font-size: 17px; }
+  .chips { margin-left: auto; display: flex; gap: 10px; }
+  .chip { font: 13px var(--mono); padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
+  .chip.live { color: var(--ok); border-color: rgba(104,211,145,.4); }
+
+  main { display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 20px; padding: 20px 28px; height: calc(100vh - 75px); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; display: flex; flex-direction: column; min-height: 0; }
+  .side h2 { margin: 0; padding: 18px 20px 6px; font-size: 22px; display: flex; align-items: center; gap: 10px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .shopper .dot { background: var(--shopper); box-shadow: 0 0 12px var(--shopper); }
+  .merchant .dot { background: var(--merchant); box-shadow: 0 0 12px var(--merchant); }
+  .sub { padding: 0 20px; color: var(--muted); font-size: 14px; }
+  .label { padding: 16px 20px 6px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .lock { font-size: 11px; padding: 1px 7px; border-radius: 4px; background: #222730; letter-spacing: .05em; }
+  dl { margin: 0; padding: 0 20px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 16px; }
+  dt { color: var(--muted); } dd { margin: 0; font-weight: 600; text-align: right; }
+  .trace { flex: 1; overflow-y: auto; padding: 4px 20px 20px; font: 13px/1.5 var(--mono); }
+  .trace div { padding: 5px 0; border-bottom: 1px dashed #20242b; color: #b8c0cc; animation: in .3s ease; }
+  .trace .tool::before { content: "⚙ "; color: var(--merchant); }
+  .trace .think::before { content: "› "; color: var(--muted); }
+  .shopper .trace .think::before { color: var(--shopper); }
+
+  .center { padding: 0; }
+  .ladder { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; padding: 22px 20px 16px; border-bottom: 1px solid var(--line); min-height: 92px; }
+  .step { font-size: 24px; font-weight: 700; padding: 8px 14px; border-radius: 10px; background: #1c2027; color: var(--muted); animation: in .4s ease; white-space: nowrap; }
+  .step small { display: block; font-size: 12px; font-weight: 500; letter-spacing: .04em; }
+  .step.struck { text-decoration: line-through; }
+  .step.current { color: var(--text); background: #232a33; outline: 2px solid var(--text); }
+  .step.final { color: #0d0f12; background: var(--ok); }
+  .arrow { color: var(--muted); font-size: 20px; }
+
+  .roomhead { padding: 12px 20px; font: 600 15px var(--mono); color: var(--muted); display: flex; justify-content: space-between; }
+  .room { flex: 1; overflow-y: auto; padding: 4px 20px 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .msg { max-width: 82%; padding: 12px 16px; border-radius: 14px; font-size: 18px; line-height: 1.4; animation: in .35s ease; }
+  .msg .who { font: 600 12px var(--mono); letter-spacing: .05em; margin-bottom: 4px; }
+  .msg.ShopperAgent { align-self: flex-start; background: var(--shopper-dim); border: 1px solid rgba(79,209,197,.35); border-bottom-left-radius: 4px; }
+  .msg.ShopperAgent .who { color: var(--shopper); }
+  .msg.MerchantAgent { align-self: flex-end; background: var(--merchant-dim); border: 1px solid rgba(246,173,85,.35); border-bottom-right-radius: 4px; }
+  .msg.MerchantAgent .who { color: var(--merchant); }
+  .mention { font-weight: 700; opacity: .7; }
+  .typing { color: var(--muted); font: 13px var(--mono); padding: 0 20px 10px; height: 24px; }
+
+  .offer { border-top: 1px solid var(--line); padding: 20px; text-align: center; }
+  .offer .k { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .price { font-size: 64px; font-weight: 800; line-height: 1.05; margin: 4px 0; }
+  .price s { font-size: 28px; color: var(--muted); font-weight: 500; margin-right: 12px; }
+  .terms { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 16px; }
+  .terms span { padding: 6px 12px; border-radius: 8px; background: #1f242c; font-size: 17px; font-weight: 600; }
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 12px; }
+  .cta { font-size: 24px; font-weight: 800; padding: 16px 44px; background: var(--ok); color: #0d0f12; letter-spacing: .04em; box-shadow: 0 0 0 0 rgba(104,211,145,.6); animation: pulse 1.8s infinite; }
+  .start { font-size: 22px; font-weight: 700; padding: 16px 40px; background: var(--text); color: #0d0f12; }
+  .ghost { background: none; color: var(--muted); text-decoration: underline; font-size: 15px; margin-top: 10px; }
+  .done { font-size: 28px; font-weight: 800; color: var(--ok); letter-spacing: .08em; }
+  .sim { font: 12px var(--mono); color: var(--muted); margin-top: 6px; }
+  .why { text-align: left; margin: 12px auto 0; max-width: 560px; padding: 0 0 0 20px; color: #c7ced8; font-size: 15px; }
+  .why li { margin: 4px 0; }
+  .muted { color: var(--muted); }
+
+  @keyframes in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(104,211,145,.55); } 70% { box-shadow: 0 0 0 18px rgba(104,211,145,0); } 100% { box-shadow: 0 0 0 0 rgba(104,211,145,0); } }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; height: auto; } .trace { max-height: 220px; } .room { max-height: 420px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">PACT</div>
+  <div class="tag">Set the bounds. Let agents make the deal.</div>
+  <div class="chips"><span class="chip" id="dealId">no deal</span><span class="chip" id="transport">room: —</span></div>
+</header>
+
+<main>
+  <section class="side shopper">
+    <h2><span class="dot"></span>Shopper Agent</h2>
+    <div class="sub">Represents the buyer</div>
+    <div class="label">Owner's boundaries <span class="lock">PRIVATE</span></div>
+    <dl id="shopperRules"></dl>
+    <div class="label">Agent reasoning <span class="lock">PRIVATE</span></div>
+    <div class="trace" id="shopperTrace"></div>
+  </section>
+
+  <section class="center">
+    <div class="ladder" id="ladder"><span class="muted">Negotiation not started</span></div>
+    <div class="roomhead"><span id="roomName"># negotiation room</span><span>shared · auditable</span></div>
+    <div class="room" id="room"></div>
+    <div class="typing" id="typing"></div>
+    <div class="offer" id="offer">
+      <button class="start" id="startBtn">Start negotiation</button>
+    </div>
+  </section>
+
+  <section class="side merchant">
+    <h2><span class="dot"></span>Merchant Agent</h2>
+    <div class="sub">Represents the store</div>
+    <div class="label">Merchant rules <span class="lock">PRIVATE</span></div>
+    <dl id="merchantRules"></dl>
+    <div class="label">Agent reasoning &amp; tools <span class="lock">PRIVATE</span></div>
+    <div class="trace" id="merchantTrace"></div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const pace = new URLSearchParams(location.search).get("pace") || "1.2";
+let deal = null, source = null, listPrice = 249, lastWhy = [];
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const money = n => "$" + Math.round(n);
+const shipLabel = s => s === "free_next_day" ? "Free next-day" : "Standard shipping";
+const day = iso => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" });
+const cap = s => s[0].toUpperCase() + s.slice(1);
+
+function renderRules(snap) {
+  const s = snap.shopper, m = snap.merchant;
+  $("shopperRules").innerHTML = [
+    ["Max price", money(s.max_price)],
+    ["Preferred", cap(s.preferred_variant)],
+    ["Acceptable", s.fallback_variants.map(cap).join(", ") + ` (if ${s.fallback_return_days}-day returns)`],
+    ["Deliver by", day(s.delivery_deadline)],
+    ["Min returns", s.minimum_return_days + " days"],
+    ["Ask me above", money(s.approval_required_above)],
+  ].map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
+  $("merchantRules").innerHTML = [
+    ["List price", money(m.list_price)],
+    ["Min margin", m.min_margin_pct + "%"],
+    ["Auto-discount cap", m.max_auto_discount_pct + "%"],
+    ["Inventory", Object.entries(m.inventory).map(([k, v]) => `${cap(k)} ${v}`).join(" · ")],
+    ["Move", m.overstock.map(cap).join(", ")],
+    ["Max returns", m.max_return_days + " days"],
+  ].map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
+}
+
+// ---- price ladder -------------------------------------------------------
+let ladder = [];
+function pushStep(main, sub, cls = "") {
+  ladder.forEach(s => s.cls = s.cls.replace("current", "").trim());
+  ladder.push({ main, sub, cls: cls || "current" });
+  $("ladder").innerHTML = ladder.map((s, i) =>
+    (i ? '<span class="arrow">→</span>' : "") +
+    `<div class="step ${s.cls}">${esc(s.main)}${s.sub ? `<small>${esc(s.sub)}</small>` : ""}</div>`).join("");
+}
+
+// ---- offer card ---------------------------------------------------------
+function showOffer(o, heading) {
+  $("offer").innerHTML = `<div class="k">${heading}</div>
+    <div class="price"><s>${money(listPrice)}</s>${money(o.price)}</div>
+    <div class="terms"><span>${cap(o.variant)}</span><span>${shipLabel(o.shipping)}</span><span>${o.return_window_days}-day returns</span></div>`;
+}
+
+function showAgreement(a, why) {
+  const t = a.terms;
+  showOffer(t, "Agreement ready · saves " + money(a.shopper_savings));
+  $("offer").insertAdjacentHTML("beforeend",
+    `<button class="cta" id="approveBtn">APPROVE ${money(t.price)}</button>
+     <div><button class="ghost" id="whyBtn">Why this deal?</button></div><div id="whyBox"></div>`);
+  $("approveBtn").onclick = approve;
+  $("whyBtn").onclick = () => toggleWhy(why);
+}
+
+function toggleWhy(why) {
+  const box = $("whyBox");
+  box.innerHTML = box.innerHTML ? "" : `<ul class="why">${why.map(w => `<li>${esc(w)}</li>`).join("")}</ul>`;
+}
+
+function showComplete(a, exec) {
+  const t = a.terms;
+  $("offer").innerHTML = `<div class="done">✓ TRANSACTION COMPLETE</div>
+    <div class="terms" style="margin-top:12px"><span>${money(t.price)}</span><span>${cap(t.variant)}</span>
+      <span>${shipLabel(t.shipping)}</span><span>${t.return_window_days}-day returns</span></div>
+    <div>Shopper saved <b>${money(a.shopper_savings)}</b> · Merchant kept margin above floor and moved overstock</div>
+    <div class="sim">order ${esc(exec?.order_id || "")} · execution simulated (no real payment)</div>
+    <div><button class="ghost" id="whyBtn">Why this deal?</button></div><div id="whyBox"></div>`;
+  $("whyBtn").onclick = () => toggleWhy(lastWhy);
+}
+
+// ---- events -------------------------------------------------------------
+function onMessage(m) {
+  const text = esc(m.text).replace(/@(\w+Agent)/g, '<span class="mention">@$1</span>');
+  $("room").insertAdjacentHTML("beforeend",
+    `<div class="msg ${m.sender}"><div class="who">@${m.sender}</div>${text}</div>`);
+  $("room").scrollTop = $("room").scrollHeight;
+  $("typing").textContent = "";
+
+  const p = m.payload || {};
+  if (p.kind === "proposal") pushStep(money(p.requested_price), "shopper asks", "");
+  if (p.kind === "counteroffer") {
+    p.offers.forEach(o => pushStep(money(o.price) + (o.shipping === "free_next_day" ? " + free ship" : ""), o.variant));
+    const best = p.offers[p.offers.length - 1];
+    showOffer(best, "Current offer");
+  }
+  if (p.kind === "conditional_accept" && p.conditions.return_window_days)
+    pushStep(p.conditions.return_window_days + "-day returns", "shopper's condition");
+  if (p.kind === "merchant_accept") showOffer(p.terms, "Merchant accepted");
+}
+
+function onTrace(e) {
+  const box = $(e.side + "Trace");
+  box.insertAdjacentHTML("beforeend", `<div class="${e.kind}">${esc(e.text)}</div>`);
+  box.scrollTop = box.scrollHeight;
+  $("typing").textContent = (e.side === "shopper" ? "ShopperAgent" : "MerchantAgent") + " is thinking…";
+}
+
+function onStatus(e) {
+  if (e.status === "awaiting_approval") {
+    lastWhy = e.why || [];
+    pushStep("AGREEMENT", "awaiting you", "final");
+    showAgreement(e.agreement, lastWhy);
+  }
+  if (e.status === "complete") showComplete(e.agreement, e.execution);
+}
+
+async function start() {
+  const res = await fetch(`/api/deals?pace=${pace}`, { method: "POST" });
+  deal = await res.json();
+  listPrice = deal.product.list_price;
+  $("dealId").textContent = deal.id.toUpperCase();
+  $("roomName").textContent = "# " + deal.id;
+  $("transport").textContent = "room: " + deal.transport;
+  $("transport").classList.toggle("live", !deal.transport.includes("simulated"));
+  renderRules(deal);
+  ladder = [];
+  pushStep(money(listPrice), "list price", "struck");
+  $("offer").innerHTML = `<div class="k">Agents negotiating…</div>`;
+  source = new EventSource(`/api/deals/${deal.id}/events`);
+  source.onmessage = ev => {
+    const e = JSON.parse(ev.data);
+    if (e.type === "message") onMessage(e.message);
+    else if (e.type === "trace") onTrace(e);
+    else if (e.type === "status") onStatus(e);
+  };
+}
+
+async function approve() {
+  $("approveBtn").disabled = true;
+  await fetch(`/api/deals/${deal.id}/approve`, { method: "POST" });
+}
+
+$("startBtn").onclick = start;
+// Show the rules before starting so the presenter can walk through them.
+fetch(`/api/scenario`).then(r => r.ok ? r.json() : null).then(s => s && renderRules(s));
+</script>
+</body>
+</html>
