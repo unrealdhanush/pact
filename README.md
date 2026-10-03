@@ -100,7 +100,7 @@ Keys created at the jevtypesafeai.com gateway (`jv_live_…`) are a different se
 
 ## Demo script (≈2–3 min)
 
-1. "Humans set intent." In the shopper panel, say (🎙, Chrome) or type: *"Find me Sony noise-cancelling
+1. "Humans set intent." In the shopper panel, speak (mic button, Chrome) or type: *"Find me Sony noise-cancelling
    headphones in black, under 300, by Tuesday."* The shopper agent resolves the product and recalls the rest
    from **Moss** memory in single-digit ms: silver is fine with 45-day returns, ask before anything over $250,
    sony.com has it for $299.99. Every boundary is tagged YOU / MEMORY / DEFAULT. Say *"yes"*.
