@@ -409,9 +409,6 @@ version = "0.26.0"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6e/7c/7160d3d7fd38ac60e20b7ff63d0a28a01e2ee9469b94828a410f691c655b/inferedge_moss_core-0.26.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:8bfcc664536a6fa5e0a9a7901643398ad3cd528525c3345628d4604f16c8548d", size = 4491880, upload-time = "2026-09-29T02:48:59.465Z" },
-    { url = "https://files.pythonhosted.org/packages/8a/15/51b2882463abe49026562de5c22f9205749270a1f7a5e4f004fae5fd3b94/inferedge_moss_core-0.26.0-cp310-abi3-manylinux_2_35_x86_64.whl", hash = "sha256:45aebc79acca4960dba84ffe06770ef28615b02a99966ce323437081975f7040", size = 5492337, upload-time = "2026-09-29T02:49:01.902Z" },
-    { url = "https://files.pythonhosted.org/packages/2e/29/4a4e3973248b123f7de57899204ab2219ac7a09dd7f9181ba5657adfe16b/inferedge_moss_core-0.26.0-cp310-abi3-manylinux_2_39_aarch64.whl", hash = "sha256:4bcc4efd314e58dcf14524780b421b54ed268ff6b316ad5f9e322e19653f3988", size = 5356361, upload-time = "2026-09-29T02:49:03.331Z" },
-    { url = "https://files.pythonhosted.org/packages/88/3b/2cf3248cf59e3adc2c531740afec0ffaee837d36b4b7a5681910e0c23499/inferedge_moss_core-0.26.0-cp310-abi3-win_amd64.whl", hash = "sha256:756bbd329f084b1ffb30e3f560e223fe22ba425ac5198cb1c46705fac1f7bb81", size = 5982191, upload-time = "2026-09-29T02:49:04.74Z" },
 ]
 
 [[package]]
@@ -465,7 +462,7 @@ dependencies = [
     { name = "band-sdk" },
     { name = "fastapi" },
     { name = "httpx" },
-    { name = "moss" },
+    { name = "moss", marker = "sys_platform == 'darwin'" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "uvicorn", extra = ["standard"] },
@@ -482,7 +479,7 @@ requires-dist = [
     { name = "band-sdk", specifier = ">=4.0.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "moss", specifier = ">=1.14.0" },
+    { name = "moss", marker = "sys_platform == 'darwin'", specifier = ">=1.14.0" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
