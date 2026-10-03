@@ -22,3 +22,9 @@ All integration badges preserve their real live/simulated status. No keys are re
 At narrow widths the panels stack; the negotiation transcript scrolls within its panel. Private reasoning and evaluated rules expand on demand. Connection interruptions show a reconnect notice; failed startup and approvals expose retry controls.
 
 The overview and workspace use separate URL views (`/` and `/#workspace`). Switching between them preserves an ongoing deal; refreshing the browser starts a fresh frontend session. Connections are available from the header disclosure. The approval screen has a **Review negotiation** control for the full transcript.
+
+The shopper's **Budget** and **Ask me above** fields are editable before negotiation. Click **Save limits** before starting; limits lock while a deal is active and unlock for the next deal. A zero approval threshold asks for approval on every purchase. Invalid or negative limits are rejected before changing any saved boundaries.
+
+Use **Sony XM5**, **Momentum 4**, or **Bose Ultra** to switch preset products. Their original AI-generated 3D-style renders are illustrative product visuals, not interactive 3D models or official manufacturer photos. The existing catalog and merchant economics still determine offers.
+
+After checkout, the delivery map follows the backend's simulated tracking events. **Replay route** previews warehouse → sorting center → destination without changing the order status. This map uses a fictional demo district and needs no map API or location access.

@@ -150,14 +150,27 @@ class Intake:
             card.update(list_price=prod.list_price, variants=list(prod.variants), specs=prod.specs)
         return card
 
-    async def choose(self, product_id: str, max_price: float | None = None) -> dict:
-        """The human picks one of the options (and optionally sets their max price)."""
+    async def choose(self, product_id: str, max_price: float | None = None,
+                     approval_required_above: float | None = None) -> dict:
+        """Pick a product and update explicit spending boundaries before negotiating."""
         pick = next((o for o in self.options if o.get("product_id") == product_id and o.get("carried")), None)
         if pick is None:
             raise ValueError("not one of the negotiable options")
+        updates = {}
+        for key, value in (("max_price", max_price), ("approval_required_above", approval_required_above)):
+            if value is None:
+                continue
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                raise ValueError("spending boundaries must be valid dollar amounts") from None
+            if isinstance(value, bool) or not math.isfinite(number) or number < 0 or (key == "max_price" and number == 0):
+                raise ValueError("budget must be positive and approval threshold cannot be negative")
+            updates[key] = number
         self.product = pick
-        if max_price is not None:
-            self.fields["max_price"] = Boundary(float(max_price), "you")
+        for key, number in updates.items():
+            self.fields[key] = Boundary(number, "you")
+        self.confirmed = False
         return self.view(self.readback())
 
     async def _recall_missing(self) -> None:

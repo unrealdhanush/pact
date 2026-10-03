@@ -179,13 +179,58 @@ body.review-timeline .room { height:260px; }
 @media(max-width:1000px) { .landing { padding:0 24px 30px; margin-top:16px; }.landing-hero { padding:24px 12px; gap:24px; }.landing h1 { font-size:54px; }.landing-copy p { font-size:16px; }.landing-visual .product-art { width:250px;height:250px; }.floating-offer { left:0;padding:16px; }.floating-offer strong { font-size:12px; }.floating-offer small { font-size:10px; }.landing-features { gap:12px; }.landing-feature { padding:20px; } }
 @media(max-width:700px) { .landing { padding:0 20px 28px; margin:20px auto 0; }.landing-hero { display:flex; flex-direction:column; padding:0; gap:10px; min-height:0; align-items:stretch; }.landing h1 { font-size:49px;letter-spacing:-2.6px; }.landing .eyebrow { font-size:12px;margin-bottom:16px; }.landing-copy p { font-size:15px;max-width:320px; }.landing-visual { min-height:310px; }.landing-visual .product-art { width:245px;height:245px;margin-bottom:40px; }.visual-halo { width:280px;height:280px; }.floating-offer { bottom:0; }.landing-features { grid-template-columns:1fr; margin-top:30px; }.landing-feature .num { margin-bottom:8px; }.landing-footer { gap:15px; }.header-end { gap:16px; }.header-link { font-size:11px; } }
 
+
+.boundary-form { margin-top:18px; }
+.boundary-form .key-rules { margin:0; }
+.boundary-input { display:block; min-width:0; background:var(--panel2); border-radius:13px; padding:12px; }
+.boundary-input > span:first-child { display:block; color:var(--muted); font-size:11px; }
+.currency-input { display:flex; align-items:center; gap:2px; font-size:21px; margin-top:5px; }
+.currency-input input { min-width:0; width:100%; padding:0; border:0; border-bottom:1px solid #b9d5f2; background:none; font-size:21px; color:var(--text); appearance:textfield; -moz-appearance:textfield; }
+.currency-input input::-webkit-inner-spin-button { appearance:none; }
+.currency-input input:disabled { border-color:transparent; color:var(--muted); }
+.boundary-help { color:var(--muted); font-size:10px; margin:8px 0; }
+.boundary-save { background:var(--shopper-dim); color:var(--shopper); font-size:11px; padding:8px 12px; border-radius:8px; }
+.boundary-status { color:var(--muted); font-size:10px; margin-top:6px; }
+.merchant-metrics { display:grid; gap:10px; margin:18px 0 0; }
+.merchant-metric { border-radius:13px; padding:12px; background:var(--panel2); }
+.merchant-metric-head { display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12px; }
+.merchant-metric strong { font-size:17px; font-weight:500; white-space:nowrap; }
+.merchant-metric p { font-size:10px; color:var(--muted); margin:5px 0 0; }
+.product-art { object-fit:contain; }
+.opt img { width:100%; height:120px; object-fit:contain; margin-bottom:12px; filter:drop-shadow(0 6px 8px #00000010); }
+.demo-products { display:flex; justify-content:center; gap:6px; flex-wrap:wrap; margin:14px 0; }
+.demo-product { border-radius:999px; padding:7px 11px; background:var(--panel2); color:var(--muted); font-size:10px; border:1px solid transparent; }
+.demo-product[aria-pressed="true"] { color:var(--shopper); border-color:#b5d6f5; background:var(--shopper-dim); }
+.render-note { font-size:9px; color:#86868b; margin-top:6px; }
+.offer-render { width:100px; height:85px; object-fit:contain; display:block; margin:0 auto 10px; }
+.roomhead { padding:18px 28px 12px; align-items:center; gap:14px; }
+.room-identity { display:flex; align-items:center; gap:10px; }
+.room-symbol { display:grid; place-items:center; width:34px; height:34px; border-radius:11px; background:var(--shopper-dim); color:var(--shopper); font-size:18px; }
+#roomName { display:block; font-size:13px; color:var(--text); font-weight:600; }
+#roomSubtitle { display:block; color:var(--muted); font-size:10px; margin-top:2px; }
+#roomMode { border-radius:999px; padding:5px 9px; background:var(--panel2); font-size:9px; }
+.route-card { margin-top:18px; border:1px solid var(--line); border-radius:18px; overflow:hidden; background:#fff; }
+.route-heading { display:flex; align-items:center; justify-content:space-between; padding:16px 18px; gap:12px; }
+.route-heading h3 { font-size:14px; margin:0 0 3px; letter-spacing:-.3px; }
+.route-heading p { font-size:10px; color:var(--muted); margin:0; }
+.route-stage { color:var(--shopper); font-size:11px; font-weight:500; white-space:nowrap; }
+.delivery-map { display:block; width:100%; aspect-ratio:620/260; background:#eef2f4; }
+.delivery-map text { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.route-footer { display:flex; gap:12px; justify-content:space-between; padding:11px 18px; font-size:10px; color:var(--muted); }
+.route-replay { background:var(--shopper-dim); color:var(--shopper); padding:6px 10px; border-radius:7px; font-size:10px; }
+.route-time { display:flex; justify-content:space-between; padding:0 18px 14px; gap:12px; color:var(--muted); font-size:10px; }
+.route-legend { font-size:9px; color:#86868b; margin-top:8px; }
+.route-marker { transition:transform 1.2s cubic-bezier(.2,.7,.2,1); }
+.track .steps { margin:16px 0 10px; }
+@media(max-width:700px) { .delivery-map { aspect-ratio:620/320; }.route-heading { padding:14px; }.route-footer,.route-time { padding-left:14px; padding-right:14px; }.roomhead { padding-left:20px; padding-right:20px; }.route-heading h3 { font-size:13px; } }
+
 </style>
 </head>
 <body class="idle">
 <header><div class="brand">pact</div><div class="tag">Agent commerce.</div><div class="header-end"><button class="header-link" id="homeBtn" hidden>Overview</button><button class="header-link" id="workspaceBtn">Open workspace ↗</button><details class="systems"><summary>Connections</summary><div class="chips" id="chips"><span class="chip deal" id="dealId">No active deal</span></div></details></div></header>
 <div class="landing" id="landingView">
   <div class="landing-hero"><div class="landing-copy"><div class="eyebrow">Meet Pact</div><h1>Good deals.<br><span>Better boundaries.</span></h1><p>A shopper agent. A merchant agent. An agreement that works for both—with you in control.</p><button class="start" id="enterBtn">Try Pact <span aria-hidden="true">↗</span></button><div class="label2">An interactive demo. No account needed.</div></div>
-  <div class="landing-visual"><div class="visual-halo" aria-hidden="true"></div><svg class="product-art" viewBox="0 0 240 240" role="img" aria-label="Headphones demo illustration"><defs><linearGradient id="landing-band" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#65676a"/><stop offset=".45" stop-color="#202226"/><stop offset="1" stop-color="#42454a"/></linearGradient><linearGradient id="landing-cup" x1="0" x2="1"><stop stop-color="#4d5055"/><stop offset=".35" stop-color="#282a2e"/><stop offset="1" stop-color="#16171a"/></linearGradient></defs><ellipse cx="120" cy="216" rx="70" ry="7" fill="#dce0e6" opacity=".6"/><g transform="rotate(-12 120 120)"><path d="M47 150V104a73 73 0 0 1 146 0v46" fill="none" stroke="url(#landing-band)" stroke-width="17" stroke-linecap="round"/><path d="M54 103a66 66 0 0 1 132 0" fill="none" stroke="#989ba0" stroke-width="2" opacity=".65"/><path d="M48 118v50m144-50v50" stroke="#75787e" stroke-width="8" stroke-linecap="round"/><rect x="30" y="139" width="40" height="64" rx="18" fill="url(#landing-cup)"/><rect x="172" y="139" width="40" height="64" rx="18" fill="url(#landing-cup)"/><rect x="62" y="146" width="13" height="50" rx="6" fill="#161719"/><rect x="167" y="146" width="13" height="50" rx="6" fill="#161719"/><path d="M38 153v34m165-34v34" stroke="#85888e" stroke-width="1.5" opacity=".4"/></g></svg><div class="floating-offer"><span class="offer-icon" aria-hidden="true">✓</span><div><strong>The details, worked out.</strong><small>Within budget. Within policy.</small></div><div class="offer-price">Your call<small>Human approval</small></div></div></div></div>
+  <div class="landing-visual"><div class="visual-halo" aria-hidden="true"></div><img class="product-art" src="/assets/sony-wh1000xm5.png" alt="Original 3D-style render of black Sony WH-1000XM5 headphones" width="300" height="300"><div class="floating-offer"><span class="offer-icon" aria-hidden="true">✓</span><div><strong>The details, worked out.</strong><small>Within budget. Within policy.</small></div><div class="offer-price">Your call<small>Human approval</small></div></div></div></div>
   <div class="landing-features"><div class="landing-feature"><div class="num">01 / Intent</div><h2>Start with what matters.</h2><p>Set your budget, preferences, and when your agent should ask.</p></div><div class="landing-feature"><div class="num">02 / Negotiation</div><h2>Let the agents work.</h2><p>They compare offers and negotiate price, delivery, and returns.</p></div><div class="landing-feature"><div class="num">03 / Control</div><h2>Keep the final say.</h2><p>Pact checks the boundaries before an agreement can go ahead.</p></div></div>
   <div class="landing-footer"><span>Built for agent-to-agent commerce.</span><span>Demo checkout · No real payments</span></div>
 </div>
@@ -202,10 +247,9 @@ body.review-timeline .room { height:260px; }
         <input id="talkInput" aria-label="Your shopping request" placeholder="Tell your agent what you want…" /><button class="send" type="submit" aria-label="Send request">↑</button>
       </form>
     </div>
-    <div class="label" id="memLabel" hidden>Recalled from memory <span class="lock">MOSS</span></div>
-    <div class="mems" id="mems"></div>
+    <details class="rule-details" id="memoryDetails" hidden><summary>Preferences from memory</summary><div class="label" id="memLabel" hidden>Recalled from memory <span class="lock">MOSS</span></div><div class="mems" id="mems"></div></details>
     <div class="label">Your boundaries <span class="lock">PRIVATE</span></div>
-    <div class="key-rules" id="shopperKeyRules"></div><details class="rule-details"><summary>Preferences &amp; boundaries</summary><dl id="shopperRules"></dl></details>
+    <form class="boundary-form" id="boundaryForm"><div class="key-rules" id="shopperKeyRules"><label class="boundary-input"><span>Budget</span><span class="currency-input">$<input id="budgetInput" type="number" min="0.01" max="1000000" step="0.01" value="300" aria-label="Shopping budget in dollars" required></span></label><label class="boundary-input"><span>Ask me above</span><span class="currency-input">$<input id="approvalInput" type="number" min="0" max="1000000" step="0.01" value="250" aria-label="Ask for approval above this dollar amount" required></span></label></div><p class="boundary-help">Budget is your spending limit. Above “Ask me above,” your agent pauses for approval.</p><button class="boundary-save" id="saveBounds" type="submit" hidden>Save limits</button><div class="boundary-status" id="boundaryStatus" role="status" aria-live="polite"></div></form><details class="rule-details"><summary>Preferences &amp; boundaries</summary><dl id="shopperRules"></dl></details>
     <details class="reasoning"><summary>Private reasoning</summary><div class="trace" id="shopperTrace"></div></details>
   </section>
 
@@ -213,23 +257,23 @@ body.review-timeline .room { height:260px; }
     <nav class="flow" aria-label="Deal progress" id="flow"><span class="active"><b>1</b> Your request</span><span><b>2</b> Negotiation</span><span><b>3</b> Policy check</span><span><b>4</b> Your approval</span></nav>
     <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
     <div class="path" id="path"><span class="muted">Negotiation not started</span></div>
-    <div class="roomhead"><span id="roomName"># deal room</span><span id="roomMode">shared · auditable</span></div>
+    <div class="roomhead"><div class="room-identity"><span class="room-symbol" aria-hidden="true">⇄</span><div><span id="roomName">Negotiation room</span><span id="roomSubtitle">Shopper + merchant · one shared conversation</span></div></div><span id="roomMode">Ready to connect</span></div>
     <div class="room" id="room" role="log" aria-label="Negotiation timeline"></div>
     <div class="typing" id="typing"></div>
     <div class="stage" id="stage">
       <div class="welcome">
-        <svg class="product-art" viewBox="0 0 240 240" role="img" aria-label="Headphones demo illustration"><defs><linearGradient id="band" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#65676a"/><stop offset=".45" stop-color="#202226"/><stop offset="1" stop-color="#42454a"/></linearGradient><linearGradient id="cup" x1="0" x2="1"><stop stop-color="#4d5055"/><stop offset=".35" stop-color="#282a2e"/><stop offset="1" stop-color="#16171a"/></linearGradient></defs><ellipse cx="120" cy="216" rx="70" ry="7" fill="#dce0e6" opacity=".6"/><g transform="rotate(-12 120 120)"><path d="M47 150V104a73 73 0 0 1 146 0v46" fill="none" stroke="url(#band)" stroke-width="17" stroke-linecap="round"/><path d="M54 103a66 66 0 0 1 132 0" fill="none" stroke="#989ba0" stroke-width="2" opacity=".65"/><path d="M48 118v50m144-50v50" stroke="#75787e" stroke-width="8" stroke-linecap="round"/><rect x="30" y="139" width="40" height="64" rx="18" fill="url(#cup)"/><rect x="172" y="139" width="40" height="64" rx="18" fill="url(#cup)"/><rect x="62" y="146" width="13" height="50" rx="6" fill="#161719"/><rect x="167" y="146" width="13" height="50" rx="6" fill="#161719"/><path d="M38 153v34m165-34v34" stroke="#85888e" stroke-width="1.5" opacity=".4"/></g></svg>
+        <img class="product-art" src="/assets/sony-wh1000xm5.png" alt="Original 3D-style render of black Sony WH-1000XM5 headphones" width="300" height="300">
         <h2>A little less back-and-forth.</h2><p>Let your shopper and merchant agents find an offer that works for both of you.</p>
-        <div class="product-line" id="productLine">Loading demo product…</div>
-        <button class="start" id="startBtn">Find a deal</button><div class="label2">Try the preset demo, or enter your own request.</div>
+        <div class="product-line" id="productLine">Loading demo product…</div><div class="demo-products" aria-label="Demo products"><button class="demo-product" data-demo="sony-wh1000xm5" aria-pressed="true">Sony XM5</button><button class="demo-product" data-demo="sennheiser-m4" aria-pressed="false">Momentum 4</button><button class="demo-product" data-demo="bose-qc-ultra" aria-pressed="false">Bose Ultra</button></div>
+        <button class="start" id="startBtn">Find a deal</button><div class="label2">Choose a demo product or enter your own request.</div><div class="render-note">Original demo renders · product appearance is illustrative.</div>
       </div>
     </div>
   </section>
 
   <section class="side merchant">
     <h2><span class="dot"></span>Merchant Agent</h2>
-    <div class="sub">Protects the store’s boundaries.</div>
-    <div class="agent-note">Convert the sale. Keep the margin.</div>
+    <div class="sub" id="merchantName">Protects the store’s boundaries.</div>
+    <div class="agent-note">Find a fair deal without selling at a loss.</div>
 
     <div class="key-rules" id="merchantKeyRules"></div><details class="rule-details"><summary>Inventory &amp; policies</summary><dl id="merchantRules"></dl></details>
     <details class="reasoning"><summary>Private reasoning &amp; tools</summary><div class="trace" id="merchantTrace"></div></details>
@@ -242,6 +286,7 @@ const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
 const pace = qs.get("pace") || "0.8";
 const dealParam = qs.get("id") || "deal-1842";
+let demoProduct = "sony-wh1000xm5", boundarySaving = false, demoChoosing = false;
 let deal = null, source = null, listPrice = 0, why = [], agreement = null, authority = null, integrations = [];
 
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -288,21 +333,23 @@ function renderChips(list, room) {
 
 function renderRoomMode(room) {
   if (!room) return;
-  $("roomName").textContent = room.title || "# deal room";
-  $("roomMode").innerHTML = room.live
-    ? (room.ws_connected >= 2
-        ? `<span class="live">● BAND live</span>${room.owner === "human" ? " · human-owned room" : ""} · ${room.posted ?? 0} msgs · ${room.ws_delivered ?? 0} via WebSocket${room.local_delivered ? ` · ${room.local_delivered} local fallback` : ""}`
-        : `<span class="live">● BAND live (REST)</span> · <span class="sim">WebSocket unavailable — ${room.local_delivered ?? 0} delivered locally</span>`)
-    : `<span class="sim">● ${esc(room.transport)}</span> · not on BAND`;
+  $('roomName').textContent = 'Negotiation room';
+  const roomCount = deal?.merchants?.length || 1;
+  $('roomSubtitle').textContent = `${deal?.product?.name || 'Your product'} · Shopper + ${roomCount > 1 ? roomCount + ' merchants' : 'merchant'}`;
+  $('roomMode').textContent = room.live ? 'BAND connected' : 'Local demo';
+  $('roomMode').title = room.live ? `${room.transport} · ${room.ws_delivered ?? 0} messages delivered via WebSocket` : 'Simulated agent communication';
   renderChips(null, room);
 }
 
 function renderRules(snap, prov = null) {
   const s = snap.shopper, m = snap.merchant;
   const tag = key => prov ? (src => `<span class="src ${src}">${src === "you" ? "YOU" : src === "memory" ? "MEMORY" : "DEFAULT"}</span>`)(prov[key]?.source || "default") : "";
-  const metric = (label, value, key) => `<dl class="key-rule"><dt>${esc(label)}</dt><dd>${esc(value)}</dd>${key ? tag(key) : ''}</dl>`;
-  $('shopperKeyRules').innerHTML = metric('Budget', money(s.max_price), 'max_price') + metric('Ask above', money(s.approval_required_above), 'approval_required_above');
-  $('merchantKeyRules').innerHTML = metric('Margin floor', m.min_margin_pct + '%') + metric('Prioritize', m.overstock.map(cap).join(', ') || '—');
+  $('budgetInput').value = s.max_price;
+  $('approvalInput').value = s.approval_required_above;
+  const stock = m.overstock.map(cap).join(', ');
+  $('merchantKeyRules').className = 'merchant-metrics';
+  $('merchantKeyRules').innerHTML = `<div class="merchant-metric"><div class="merchant-metric-head"><span>Minimum profit</span><strong>${esc(m.min_margin_pct)}%</strong></div><p>The store keeps at least ${esc(m.min_margin_pct)}¢ of each sale dollar after product and deal costs.</p></div><div class="merchant-metric"><div class="merchant-metric-head"><span>Extra stock</span><strong>${esc(stock || 'None')}</strong></div><p>${stock ? 'More units are available in this color, so the store may offer a better deal.' : 'No color is overstocked. Offers follow the store’s usual pricing rules.'}</p></div>`;
+  setBoundaryLock();
   $("shopperRules").innerHTML = [
 
     ["Preferred", cap(s.preferred_variant), "preferred_variant"],
@@ -314,11 +361,11 @@ function renderRules(snap, prov = null) {
   $("merchantRules").innerHTML = [
     ["List price", money(m.list_price)],
 
-    ["Auto-discount cap", m.max_auto_discount_pct + "%"],
+    ["Discount limit", m.max_auto_discount_pct + "%"],
     ["Inventory", Object.entries(m.inventory).map(([k, v]) => `${cap(k)} ${v}`).join(" · ")],
-    ["Floors", Object.entries(m.variant_floor).map(([k, v]) => `${cap(k)} ≥ ${money(v)}`).join(" · ") || "—"],
+    ["Lowest allowed prices", Object.entries(m.variant_floor).map(([k, v]) => `${cap(k)} ≥ ${money(v)}`).join(" · ") || "—"],
 
-    ["Max returns", m.max_return_days + " days"],
+    ["Longest return window", m.max_return_days + " days"],
   ].map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
 }
 
@@ -335,7 +382,7 @@ function pushStep(main, sub, cls = "current") {
 }
 // ---- stage --------------------------------------------------------------------
 function offerHTML(o, heading, savings) {
-  return `<div class="k">${esc(heading)}</div>
+  return `${heading === "Your agreed offer" ? productImage(deal?.product?.id || demoProduct, "offer-render") : ""}<div class="k">${esc(heading)}</div>
     <div class="price"><s>${money(listPrice)}</s>${money(o.price)}</div>
     <div class="terms"><span>${cap(o.variant)}</span><span>${shipLabel(o.shipping)}</span><span>${o.return_window_days}-day returns</span></div>
     ${savings ? `<div class="save">Shopper saves ${money(savings)}</div>` : ""}`;
@@ -408,6 +455,7 @@ function showComplete(e) {
   $("whyBtn").onclick = toggleWhy;
   $("transcriptBtn").onclick = () => { const show = document.body.classList.toggle("review-timeline"); $("transcriptBtn").textContent = show ? "Hide negotiation" : "Review negotiation"; };
   $("againBtn").onclick = () => start();
+  renderTracking();
 }
 
 function showBlocked(e) {
@@ -477,6 +525,7 @@ function onAuthority(e) {
 
 function onStatus(e) {
   deal.status = e.status;
+  setBoundaryLock();
   if (["awaiting_approval", "complete", "failed"].includes(e.status)) progress(3);
   if (e.why) why = e.why;
   if (e.status === "awaiting_exception" && e.exception) { showException(e.exception); return; }
@@ -496,9 +545,68 @@ async function request(url, options) {
   if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(typeof body.detail === 'string' ? body.detail : 'Request failed. Please try again.'); }
   return response;
 }
+const DEMO_PRODUCTS = {
+  'sony-wh1000xm5': { name:'Sony WH-1000XM5', short:'Sony XM5' },
+  'sennheiser-m4': { name:'Sennheiser Momentum 4', short:'Momentum 4' },
+  'bose-qc-ultra': { name:'Bose QuietComfort Ultra', short:'Bose Ultra' }
+};
+function productImage(id, className) {
+  const p = DEMO_PRODUCTS[id];
+  return p ? `<img src="/assets/${id}.png" class="${className}" alt="Original illustrative render of ${esc(p.name)}" loading="lazy">` : '';
+}
+function dealRunning() { return starting || !!(deal && source && !['complete','failed'].includes(deal.status)); }
+function setBoundaryLock() {
+  const locked = dealRunning() || boundarySaving || demoChoosing;
+  ['budgetInput','approvalInput','saveBounds'].forEach(id => { $(id).disabled = locked; });
+  if (dealRunning()) { $('saveBounds').hidden = true; $('boundaryStatus').textContent = 'Limits are locked for this deal. Edit them before the next one.'; }
+  else if (!boundarySaving) $('boundaryStatus').textContent = '';
+}
+async function ensureIntake(productId = demoProduct) {
+  if (intake?.options?.some(o => o.carried && o.product_id === productId)) return;
+  const s = scenarioCache?.shopper;
+  if (!s) throw new Error('The demo is still loading. Please try again.');
+  const value = key => intake?.fields?.[key]?.value ?? s[key];
+  const r = await request('/api/intake', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text:`Find ${DEMO_PRODUCTS[productId].name} noise-cancelling headphones in ${value('preferred_variant')} under ${value('max_price')} by ${day(value('delivery_deadline'))}, ask me above ${value('approval_required_above')}, with ${value('minimum_return_days')}-day returns`}) });
+  intake = await r.json();
+}
+$('boundaryForm').onsubmit = async e => {
+  e.preventDefault(); if (dealRunning() || boundarySaving || demoChoosing || !$('boundaryForm').reportValidity()) return;
+  const budget = Number($('budgetInput').value), ask = Number($('approvalInput').value);
+  boundarySaving = true; setBoundaryLock();
+  try {
+    await ensureIntake();
+    const showingOptions = !!$('maxPrice');
+    if (await choose(null, budget, ask, showingOptions)) {
+      $('saveBounds').hidden = true;
+      $('boundaryStatus').textContent = 'Limits saved for your next negotiation.';
+    }
+  } catch (error) { notice(error.message); }
+  finally { boundarySaving = false; ['budgetInput','approvalInput','saveBounds'].forEach(id => { $(id).disabled = false; }); }
+};
+['budgetInput','approvalInput'].forEach(id => { $(id).oninput = () => { $('saveBounds').hidden = false; $('boundaryStatus').textContent = 'Save your limits before starting a deal.'; }; });
+document.querySelectorAll('[data-demo]').forEach(button => {
+  button.onclick = async () => {
+    if (dealRunning() || demoChoosing || boundarySaving) return;
+    if (!$('saveBounds').hidden) { notice('Save your updated limits before changing products.'); return; }
+    demoChoosing = true; setBoundaryLock();
+    try {
+      await ensureIntake(button.dataset.demo);
+      if (await choose(button.dataset.demo, null, null, false)) {
+        const hero = $('stage').querySelector('.product-art');
+        if (hero) { hero.src = `/assets/${demoProduct}.png`; hero.alt = `Original illustrative render of ${DEMO_PRODUCTS[demoProduct].name}`; }
+        $('productLine').textContent = `${intake.product.name} · list ${money(intake.product.list_price)}`;
+        document.querySelectorAll('[data-demo]').forEach(b => b.setAttribute('aria-pressed',String(b.dataset.demo === demoProduct)));
+      }
+    } catch (error) { notice(error.message); }
+    finally { demoChoosing = false; setBoundaryLock(); }
+  };
+});
 async function start(intakeId = null) {
-  if (starting || (deal && !['complete','failed'].includes(deal.status) && source)) return;
-  starting = true; notice(); progress(1);
+  if (!$('saveBounds').hidden) { notice("Save your updated limits before starting the deal."); return; }
+  if (boundarySaving || demoChoosing || starting || (deal && !['complete','failed'].includes(deal.status) && source)) return;
+  intakeId ??= intake?.product?.carried ? intake.intake_id : null;
+  starting = true; notice(); progress(1); setBoundaryLock();
+  stopMapReplay();
   try {
   if (source) source.close();
   document.body.classList.remove("decision", "review-timeline");
@@ -513,7 +621,7 @@ async function start(intakeId = null) {
   renderRoomMode(deal.room);
   renderRules(deal, deal.intake);
   pushStep(money(listPrice), "list price", "struck");
-  $("stage").innerHTML = `<div class="k">Agents negotiating in ${esc(deal.room?.title || deal.id)}…</div>`;
+  $("stage").innerHTML = `<div class="k">Finding the best offer for ${esc(deal.product.name)}…</div>`;
   source = new EventSource(`/api/deals/${deal.id}/events`);
   source.onerror = () => notice('Connection interrupted. Reconnecting to the deal room…');
   source.onopen = () => notice();
@@ -536,7 +644,7 @@ async function start(intakeId = null) {
     deal = null; source = null; notice(error.message); progress(0);
     $('stage').innerHTML = '<div class="k">Could not open the deal room</div><button class="again" id="retryBtn">Try again</button>';
     $('retryBtn').onclick = () => start(intakeId);
-  } finally { starting = false; }
+  } finally { starting = false; setBoundaryLock(); }
 }
 
 // ---- talk to the shopper agent (Moss memory; browser speech in/out) ----------
@@ -553,7 +661,8 @@ function agentSays(text, speak = true) {
     speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1.05; speechSynthesis.speak(u);
   }
 }
-function renderIntake(v) {
+function renderIntake(v, showOptions = true) {
+  if (v.product?.carried) demoProduct = v.product.product_id;
   const f = v.fields, val = k => f[k]?.value;
   const shopper = { max_price: val("max_price") ?? 0, preferred_variant: val("preferred_variant") || "—",
     fallback_variants: val("fallback_variants") || [], fallback_return_days: val("fallback_return_days") ?? 45,
@@ -563,10 +672,11 @@ function renderIntake(v) {
     Object.assign(shopper, { competitor_price: val("competitor_price"), competitor_retailer: val("competitor_retailer") });
   if (scenarioCache) renderRules({ shopper, merchant: scenarioCache.merchant }, f);
   $("memLabel").hidden = !v.recalled.length;
+  $("memoryDetails").hidden = !v.recalled.length;
   const live = v.memory?.mode === "live";
   $("mems").innerHTML = v.recalled.map(r => `<div>“${esc(r.text)}”<span class="ms">${live ? r.ms + " ms" : "local"}</span></div>`).join("");
-  if (v.options?.length) renderOptions(v);
-  else if (v.product && $("productLine")) $("productLine").textContent = `${v.product.name}${v.product.carried ? "" : " — not sold by reachable merchants"}`;
+  if (showOptions && v.options?.length) { document.body.classList.remove("decision", "review-timeline"); progress(0); renderOptions(v); }
+  else if (v.product && $("productLine")) $("productLine").textContent = `${v.product.name}${v.product.carried ? " · list " + money(v.product.list_price) : " — not sold by reachable merchants"}`;
 
 }
 const PREF_LABEL = { best: "Best match", cheapest: "Cheapest", fastest: "Fastest delivery" };
@@ -590,17 +700,55 @@ function showException(x) {
 const TRACK_STAGES = ["confirmed", "packed", "shipped", "out_for_delivery", "delivered"];
 const TRACK_LABEL = { confirmed: "Confirmed", packed: "Packed", shipped: "Shipped", out_for_delivery: "Out for delivery", delivered: "Delivered" };
 let tracking = {};
-function onTracking(e) {
-  tracking[e.stage] = e;
-  const box = $("track"); if (!box) return;
-  const reached = TRACK_STAGES.filter(k => tracking[k]).length;
-  const last = tracking[TRACK_STAGES[reached - 1]];
-  box.innerHTML = `<div class="k">Order tracking · ${esc(e.merchant_name || "")} · ${esc(e.tracking_no)} <span class="src default">SIMULATED</span></div>
-    <ol class="steps">${TRACK_STAGES.map((k, i) => `<li class="${i < reached - 1 ? "done" : i === reached - 1 ? "now" : ""}">
-      <span class="dotc"></span><b>${TRACK_LABEL[k]}</b><small>${tracking[k] ? day(tracking[k].date) : ""}</small></li>`).join("")}</ol>
-    <div class="tl">${esc(last.label)}${deal?.room?.live ? " · posted to the BAND deal room" : ""}</div>`;
+let mapReplayTimer = null, mapReplayIndex = null;
+function stopMapReplay() { if (mapReplayTimer) clearInterval(mapReplayTimer); mapReplayTimer = null; mapReplayIndex = null; }
+function shippingMap(stage) {
+  const points = [[95,170],[95,170],[285,120],[430,120],[525,65]], [x,y] = points[stage];
+  const road = 'M95 170H185V120H430V65H525';
+  const progress = [0,0,44,72,100][stage];
+  return `<svg class="delivery-map" viewBox="0 0 620 260" role="img" aria-label="Simulated delivery map: warehouse to sorting center to destination. Current stage: ${TRACK_LABEL[TRACK_STAGES[stage]]}">
+    <rect width="620" height="260" fill="#edf1f3"/>
+    <g fill="#e0e9df"><rect x="15" y="12" width="115" height="60" rx="12"/><rect x="355" y="165" width="140" height="75" rx="15"/><rect x="530" y="145" width="75" height="80" rx="12"/></g>
+    <path d="M285-20Q255 75 310 155T310 290" fill="none" stroke="#d0e6f3" stroke-width="28"/>
+    <g fill="#e4e7ec"><rect x="147" y="20" width="75" height="58" rx="8"/><rect x="345" y="20" width="48" height="57" rx="7"/><rect x="450" y="155" width="55" height="34" rx="6"/><rect x="28" y="100" width="40" height="30" rx="5"/><rect x="95" y="95" width="62" height="36" rx="5"/><rect x="216" y="173" width="38" height="48" rx="5"/><rect x="474" y="16" width="110" height="25" rx="5"/><rect x="355" y="92" width="40" height="16" rx="4"/></g>
+    <g fill="none" stroke="#fff" stroke-width="10" stroke-linejoin="round"><path d="M0 85H620M0 145H620M0 225H620M80 0V260M185 0V260M430 0V260M525 0V260"/><path d="M0 170H185V120H620M430 120V65H620"/></g>
+    <path d="${road}" fill="none" stroke="#b9cee3" stroke-width="5" stroke-linejoin="round" pathLength="100"/>
+    <path d="${road}" fill="none" stroke="#0071e3" stroke-width="5" stroke-linejoin="round" pathLength="100" stroke-dasharray="${progress} 100"/>
+    <g fill="#fff" stroke="#0071e3" stroke-width="2"><circle cx="95" cy="170" r="6"/><circle cx="285" cy="120" r="6"/><circle cx="525" cy="65" r="6"/></g>
+    <g font-size="11" fill="#5c6c7a"><text x="35" y="195">Demo warehouse</text><text x="238" y="101">Sorting center</text><text x="485" y="46">Destination</text><text x="365" y="213" fill="#799279" font-size="10">Park</text><text x="15" y="30" font-size="10" fill="#8f9ba7">Demo district</text></g>
+    <g class="route-marker" transform="translate(${x} ${y})"><circle r="17" fill="#0071e3"/><circle r="21" fill="none" stroke="#0071e325" stroke-width="7"/><g fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"><path d="M-8-5H3V5H-8Z M3-2H6L9 1V5H3"/><circle cx="-4" cy="6" r="2" fill="#0071e3"/><circle cx="6" cy="6" r="2" fill="#0071e3"/></g></g>
+  </svg>`;
+}
+function renderTracking() {
+  const box = $('track'); if (!box) return;
+  const latestIndex = Math.max(...TRACK_STAGES.map((stage, i) => tracking[stage] ? i : -1));
+  if (latestIndex < 0) return;
+  const last = tracking[TRACK_STAGES[latestIndex]], shown = mapReplayIndex ?? latestIndex;
+  box.innerHTML = `<div class="route-card"><div class="route-heading"><div><h3>Your delivery, on the way</h3><p>${esc(last.merchant_name || 'Merchant')} · ${esc(last.tracking_no)}</p></div><span class="route-stage">${mapReplayIndex != null ? 'Route preview' : TRACK_LABEL[TRACK_STAGES[latestIndex]]}</span></div>${shippingMap(shown)}<div class="route-footer"><span>Warehouse → sorting center → destination</span><span class="src default">SIMULATED</span></div><div class="route-time"><span>${agreement?.terms?.delivery_date ? 'Arrives ' + day(agreement.terms.delivery_date) : 'Demo delivery route'}</span><button class="route-replay" id="mapReplayBtn">${mapReplayIndex != null ? 'Stop preview' : 'Replay route'}</button></div></div>
+    <ol class="steps">${TRACK_STAGES.map((stage, i) => `<li class="${i < latestIndex ? 'done' : i === latestIndex ? 'now' : ''}"><b>${TRACK_LABEL[stage]}</b><small>${tracking[stage] ? day(tracking[stage].date) : ''}</small></li>`).join('')}</ol><div class="tl" role="status">${esc(last.label)}</div><div class="route-legend">Illustrative demo route. No real location or carrier data is used.</div>`;
+  $('mapReplayBtn').onclick = () => {
+    if (mapReplayTimer) { stopMapReplay(); renderTracking(); return; }
+    mapReplayIndex = 0; renderTracking();
+    mapReplayTimer = setInterval(() => {
+      if (mapReplayIndex >= 4) { stopMapReplay(); renderTracking(); return; }
+      mapReplayIndex++; renderTracking();
+    }, 1400);
+  };
+}
+function onTracking(e) { tracking[e.stage] = e; renderTracking(); }
+
+async function refreshWinningMerchant() {
+  const current = deal;
+  try {
+    const r = await request(`/api/deals/${encodeURIComponent(current.id)}`), snap = await r.json();
+    if (deal !== current) return;
+    renderRules(snap, current.intake);
+    const chosen = snap.merchants?.find(m => m.id === snap.winner);
+    if (chosen) $('merchantName').textContent = `${chosen.name} · ${chosen.runtime === 'ZooWork' ? 'ZooWork runtime' : 'local demo'}`;
+  } catch { /* The existing policy panel remains usable if the snapshot is unavailable. */ }
 }
 function onQuotes(e) {
+  refreshWinningMerchant();
   const rows = e.quotes.map(q => q.failed
     ? `<tr><td>${esc(q.name)}</td><td colspan="3">no deal · ${esc(q.failed)}</td></tr>`
     : `<tr class="${q.merchant === e.winner ? "win" : ""}"><td>${q.merchant === e.winner ? "▸ " : ""}${esc(q.name)}</td><td>${money(q.price)} ${esc(q.variant)}</td>
@@ -625,7 +773,7 @@ function renderOptions(v) {
       ? `<div class="ref">Seen at ${esc(f.competitor_retailer.value)}: ${money(f.competitor_price.value)}</div>` : "";
     return o.carried
       ? `<div class="opt ${o.product_id === sel ? "sel" : ""}" data-pid="${o.product_id}" role="button" tabindex="0">
-           <div class="nm">${esc(o.name)}</div><div class="sp">${esc(o.specs || "")}</div>
+           ${productImage(o.product_id, "catalog-render")}<div class="nm">${esc(o.name)}</div><div class="sp">${esc(o.specs || "")}</div>
            <div class="pr">${money(o.list_price)}</div>${ref}
            <div class="vr">${(o.variants || []).map(cap).join(" · ")} · Aria Audio</div></div>`
       : `<div class="opt off" title="No merchant agent on BAND sells this"><div class="nm">${esc(o.name)}</div>
@@ -636,7 +784,7 @@ function renderOptions(v) {
     ${controls}<div class="opts">${cards}</div>
     <div class="market" id="market"><div class="k"><span class="spin"></span>Checking live prices across the web…</div></div>
     <div class="budget"><span class="k">Max I'll pay</span>
-      <input type="range" id="maxPrice" min="150" max="500" step="5" value="${max}" />
+      <input type="range" id="maxPrice" min="50" max="${Math.max(500, Math.ceil(max / 50) * 50)}" step="1" aria-label="Shopping budget" value="${max}" />
       <b id="maxLabel">${money(max)}</b><span class="src ${src}">${src === "you" ? "YOU" : src.toUpperCase()}</span></div>
     <button class="start" id="startBtn">Negotiate for me</button>`;
   document.querySelectorAll(".opt[data-pid]").forEach(el => {
@@ -669,15 +817,21 @@ async function loadMarket(pid) {
     <ul class="mk">${rows || `<li class="none">No live listings found right now.</li>`}${agents}</ul>
     <div class="mk-note">Web prices come from search results and may differ at checkout. Retailers become negotiable by running a Pact merchant agent.</div>`;
 }
-async function choose(productId, maxPrice) {
-  const r = await fetch(`/api/intake/${intake.intake_id}/choose`, { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ product_id: productId || intake.product.product_id, ...(maxPrice != null ? { max_price: maxPrice } : {}) }) });
-  if (!r.ok) return;
-  intake = await r.json();
-  renderIntake(intake);
+async function choose(productId, maxPrice, approvalAbove = null, showOptions = true) {
+  try {
+    const r = await request(`/api/intake/${intake.intake_id}/choose`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_id: productId || intake.product.product_id, ...(maxPrice != null ? { max_price: maxPrice } : {}), ...(approvalAbove != null ? { approval_required_above: approvalAbove } : {}) }) });
+    intake = await r.json(); demoProduct = intake.product.product_id;
+    const scenarioResponse = await request(`/api/scenario?product_id=${encodeURIComponent(demoProduct)}`);
+    scenarioCache = await scenarioResponse.json();
+    renderIntake(intake, showOptions); notice();
+    return true;
+  } catch (error) { notice(error.message); return false; }
 }
+
 async function say(text) {
   text = text.trim(); if (!text) return;
+  if (dealRunning()) { notice("Finish this deal before starting a new shopping request."); return; }
   bubble("you", text);
   let r;
   try { r = await request("/api/intake", { method: "POST", headers: { "Content-Type": "application/json" },
