@@ -60,3 +60,23 @@ async def test_intake_deal_completes_and_is_remembered():
     assert remembered == ["local"]
     hits, _ = await mem.recall("what did I buy last time silver", top_k=6)
     assert any(h.id.startswith("outcome-") for h in hits)
+
+
+async def test_discovery_ranks_band_peers_and_picks_the_runnable_merchant(monkeypatch):
+    from pact import discovery
+    from pact.band import BandConfig
+    monkeypatch.setattr("pact.memory.memory", memory_mod.ShopperMemory())
+
+    async def fake_request(method, url, key, body):
+        assert url.endswith("/agent/peers") and key == "shop-key"
+        return {"data": [
+            {"type": "User", "name": "Dhanush"},
+            {"type": "Agent", "name": "KitchenProAgent", "description": "sells espresso machines and blenders"},
+            {"type": "Agent", "name": "MerchantAgent", "description": "Aria Audio: sells Sony WH-1000XM5 headphones and audio"},
+            {"type": "Agent", "name": "ShopperAgent", "description": "shopper"},
+        ]}
+    monkeypatch.setattr(discovery, "urllib_request", fake_request)
+    found = await discovery.discover_merchant("Sony WH-1000XM5", BandConfig("shop-key", "merch-key"))
+    assert [c["name"] for c in found["candidates"]][0] == "MerchantAgent"
+    assert found["chosen"]["name"] == "MerchantAgent" and found["ranker"] == "local"
+    assert "ShopperAgent" not in [c["name"] for c in found["candidates"]]

@@ -25,6 +25,7 @@ The header shows one badge per sponsor integration: green **LIVE** or amber **SI
 | **BAND** (deal room) | `BAND_HUMAN_API_KEY` (registers ShopperAgent + MerchantAgent once and caches their keys in gitignored `.env.band`) **or** `BAND_SHOPPER_AGENT_KEY` + `BAND_MERCHANT_AGENT_KEY` | In-process room, "local (simulated)". If BAND fails mid-deal the room degrades to local delivery and says so. |
 | **Jev** (authority gate) | `JEV_API_KEY` or `TYPESAFE_API_KEY` set (see [Jev setup](#jev-setup-typesafe-ai)). `pact/authority.py` → `pact/jev.py`: one Choice decision + a Noul risk check on the BAND transcript (flags manipulation / prompt injection) | Deterministic local policy rules in `pact/gate.py`, shown as "Jev live decision service unavailable — local policy rules". |
 | **ZooWork** (merchant runtime) | `ZOOWORK_API_KEY` + agent created once with `uv run python -m pact.zoowork_setup` (id in gitignored `.local/zoowork.json`; `--update` after changing its instructions/tools) | Local merchant agent on the deterministic engine; also used per turn if ZooWork errors or times out. |
+| **Moss** (shopper memory) | `MOSS_PROJECT_ID` + `MOSS_PROJECT_KEY`; seed once with `uv run python -m pact.memory --seed` (indexes `pact-shopper-memory`, `pact-product-catalog`). Talk panel recall, per-intake session, BAND merchant ranking, outcome write-back | Local keyword search over the same seed memories, labelled. |
 | **Tavily** (competitor price) | `TAVILY_API_KEY`: the merchant's `verify_competitor_price` tool checks the shopper's cited price live | Last good live result from `pact/data/competitor_cache.json`, labelled *cached* with its timestamp. |
 
 Checkout and inventory reservation are always simulated (no payments).
@@ -97,18 +98,21 @@ the local rules (`pact/gate.py` takes the stricter decision) and falls back to t
 Keys created at the jevtypesafeai.com gateway (`jv_live_…`) are a different service
 (`https://jevtypesafeai.com/api/v1/decide`) and do not work at `api.typesafe.ai`.
 
-## Demo script (≈2 min)
+## Demo script (≈2–3 min)
 
-1. "Humans set intent and boundaries." Point at the two private columns: shopper wants a Sony WH-1000XM5
-   in black, ≤ $300, by Tuesday, asks for approval above $250, and found it at sony.com for $299.99;
-   merchant (shelf $329.99) has 2 black / 17 silver, an 18% margin floor and a 10% discount cap.
-2. Start. The agents negotiate in `#DEAL-1842`: $279 black + "sony.com has it for $299.99" → the merchant
-   (on ZooWork) verifies sony.com live with **Tavily** → black held at $319.99, silver price-matched at
-   $299.99 with free next-day → shopper takes silver if returns go to 45 days → merchant accepts.
-3. "Pact checks authority." Jev gate: merchant rules PASS, shopper rules APPROVAL REQUIRED,
-   decision HUMAN APPROVAL REQUIRED, because $299.99 is above the $250 auto-approve limit.
-4. Open "Why this deal?", then press **APPROVE $299.99** → TRANSACTION COMPLETE.
-5. "Humans define intent. Agents negotiate. Pact checks authority. Humans stay in control."
+1. "Humans set intent." In the shopper panel, say (🎙, Chrome) or type: *"Find me Sony noise-cancelling
+   headphones in black, under 300, by Tuesday."* The shopper agent resolves the product and recalls the rest
+   from **Moss** memory in single-digit ms: silver is fine with 45-day returns, ask before anything over $250,
+   sony.com has it for $299.99. Every boundary is tagged YOU / MEMORY / DEFAULT. Say *"yes"*.
+2. "The shopper finds a merchant." It searches **BAND**'s agent directory, ranks the merchant agents with Moss,
+   and invites @MerchantAgent into `#DEAL-1842`.
+3. The negotiation: $278 black + the sony.com price → the merchant (on **ZooWork**) verifies sony.com live with
+   **Tavily** → black held at $319.99, silver price-matched at $299.99 with free next-day → shopper takes silver
+   if returns go to 45 days → merchant accepts.
+4. "Pact checks authority." **Jev**: merchant rules PASS, shopper rules APPROVAL REQUIRED, decision
+   HUMAN APPROVAL REQUIRED ($299.99 is above the $250 limit). Press **APPROVE $299.99** → TRANSACTION COMPLETE.
+5. "And it remembers." The outcome is written back to Moss; the next conversation recalls it.
+6. "Humans define intent. Agents negotiate. Pact checks authority. Humans stay in control."
 
 ## Layout
 
@@ -120,6 +124,8 @@ Keys created at the jevtypesafeai.com gateway (`jv_live_…`) are a different se
 | `pact/agents/` | Shopper and merchant agents. `zoowork_merchant.py` = ZooWork-hosted merchant (instructions + custom tools, leak guard, local fallback); `merchant_tools.py` = its tools. |
 | `pact/zoowork.py`, `pact/zoowork_setup.py` | ZooWork REST client (no official Python SDK) and one-time agent setup. |
 | `pact/tavily.py` | Competitor price verification (live Tavily, timestamped cached fallback). |
+| `pact/memory.py`, `pact/intake.py` | Moss shopper memory (long-term index + live session + catalog) and the talk-to-your-agent intake (parse → recall → read-back with provenance). |
+| `pact/discovery.py` | Shopper finds a merchant: BAND `/agent/peers` ranked by Moss. |
 | `pact/authority.py`, `pact/jev.py` | Live authority check for the gate: policy facts in code + Jev decision and transcript risk; can only tighten. |
 | `pact/transport.py` | `Room` interface + `LocalRoom` (simulated fallback). |
 | `pact/band.py` | `BandRoom`: BAND Agent API + WebSocket transport, agent bootstrap, `python -m pact.band check`. |

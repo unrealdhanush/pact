@@ -7,7 +7,7 @@ import time
 from dataclasses import asdict
 from typing import Literal
 
-from . import gate
+from . import discovery, gate
 from .agents.merchant import MerchantAgent
 from .agents.shopper import ShopperAgent
 from .agents.zoowork_merchant import ZooWorkMerchantAgent
@@ -91,6 +91,8 @@ class Deal:
         if self.room is None:
             try:
                 cfg = self._band or await bootstrap_agents()
+                if cfg:
+                    await self._discover(cfg)
                 self.room = await BandRoom.create(self.id, cfg) if cfg else LocalRoom(self.id)
             except Exception as e:  # noqa: BLE001 - never block the demo on BAND
                 log.warning("BAND room setup failed: %s", e)
@@ -108,6 +110,22 @@ class Deal:
             self.merchant = MerchantAgent(self.room, self._trace, self.merchant_state, self.product,
                                           pace=self.pace)
         self.emit("room", room=self.room.status())
+
+    async def _discover(self, cfg) -> None:
+        """Shopper agent searches BAND's agent directory for a merchant that sells the product."""
+        self._trace("shopper", "think", f"Searching BAND's agent directory for merchants selling the {self.product.name}…")
+        try:
+            found = await discovery.discover_merchant(self.product.name, cfg)
+        except Exception as e:  # noqa: BLE001 - discovery is best-effort; the configured merchant still works
+            self._trace("shopper", "think", f"BAND directory unavailable ({type(e).__name__}); using known MerchantAgent")
+            return
+        for c in found["candidates"]:
+            self._trace("shopper", "tool", f"band_lookup_peers → {c['name']} · relevance {c['score']:.2f}")
+        if found["chosen"]:
+            self._trace("shopper", "think", f"Best match: @{found['chosen']['name']} "
+                        f"(ranked by {'Moss' if found['ranker'] == 'moss' else 'keywords'} in {found['ms']} ms) — "
+                        f"inviting it to the deal room")
+        self.emit("discovery", **found)
 
     async def run(self) -> None:
         await self.setup()

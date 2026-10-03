@@ -447,6 +447,7 @@ async function start(intakeId = null) {
     else if (e.type === "room") { deal.room = e.room; renderRoomMode(e.room); }
     else if (e.type === "status") onStatus(e);
     else if (e.type === "memory") agentSays(`Saved to memory: ${e.text}`, false);
+    else if (e.type === "discovery" && e.chosen) pushStep(`FOUND @${e.chosen.name}`, `BAND directory · ${e.candidates.length} merchants`);
   };
 }
 

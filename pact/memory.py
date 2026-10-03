@@ -217,3 +217,23 @@ if __name__ == "__main__":
     import pact  # noqa: F401  (loads .env)
     if "--seed" in sys.argv:
         asyncio.run(_seed())
+
+
+async def rank(texts: dict[str, str], query: str) -> tuple[list[tuple[str, float]], float, str]:
+    """Rank short texts (id -> text) by semantic relevance to `query` in a throwaway Moss
+    session (local, in-memory). Returns ([(id, score)], ms, "moss" | "local")."""
+    await memory.load()
+    t0 = time.perf_counter()
+    if memory.client is not None:
+        try:
+            from moss import DocumentInfo, QueryOptions
+            session = await memory.client.session(index_name=f"pact-rank-{int(time.time() * 1000)}", model_id=MODEL)
+            await session.add_docs([DocumentInfo(id=k, text=v) for k, v in texts.items()])
+            t0 = time.perf_counter()  # time the query itself, not session setup
+            res = await session.query(query, QueryOptions(top_k=len(texts), alpha=0.8))
+            return [(d.id, float(d.score or 0)) for d in res.docs], (time.perf_counter() - t0) * 1000, "moss"
+        except Exception as e:  # noqa: BLE001
+            log.warning("Moss rank failed, using keyword overlap: %s", e)
+    q = _words(query)
+    scored = sorted(((k, len(q & _words(v)) / (len(q) or 1)) for k, v in texts.items()), key=lambda x: -x[1])
+    return scored, (time.perf_counter() - t0) * 1000, "local"
