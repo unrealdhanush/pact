@@ -14,6 +14,8 @@ class Product:
     list_price: float = 329.99  # the merchant's shelf price (MSRP $399.99)
     variants: tuple[str, ...] = ("black", "silver")
     specs: str = "Over-ear · industry-leading ANC · 30 h battery"
+    search: str = "Sony WH-1000XM5 price"  # live market search (Tavily)
+    match: tuple[str, ...] = ("wh1000xm5",)  # tokens a listing title/url must contain
 
 
 @dataclass
@@ -62,15 +64,17 @@ def next_weekday(d: date, weekday: int) -> date:
 CATALOG: dict[str, tuple[Product, dict]] = {
     "sony-wh1000xm5": (Product(), {}),  # MerchantState defaults are the Sony economics
     "sennheiser-m4": (
-        Product(id="sennheiser-m4", name="Sennheiser Momentum 4", list_price=259.99,
-                variants=("black", "white"), specs="Over-ear · adaptive ANC · 60 h battery"),
-        dict(list_price=259.99, unit_cost=170, inventory={"black": 9, "white": 4}, overstock={"black"},
+        Product(id="sennheiser-m4", name="Sennheiser Momentum 4", list_price=209.99,
+                variants=("black", "white"), specs="Over-ear · adaptive ANC · 60 h battery",
+                search="Sennheiser Momentum 4 Wireless price", match=("momentum4wireless",)),
+        dict(list_price=209.99, unit_cost=145, inventory={"black": 9, "white": 4}, overstock={"black"},
              variant_floor={}),
     ),
     "bose-qc-ultra": (
-        Product(id="bose-qc-ultra", name="Bose QuietComfort Ultra", list_price=429.00,
-                variants=("black", "white"), specs="Over-ear · immersive audio · 24 h battery"),
-        dict(list_price=429.00, unit_cost=300, inventory={"black": 5, "white": 6}, overstock=set(),
+        Product(id="bose-qc-ultra", name="Bose QuietComfort Ultra (2nd Gen)", list_price=449.00,
+                variants=("black", "white"), specs="Over-ear · immersive audio · 30 h battery",
+                search="Bose QuietComfort Ultra Headphones 2nd Gen price", match=("quietcomfortultra", "2ndgen")),
+        dict(list_price=449.00, unit_cost=315, inventory={"black": 5, "white": 6}, overstock=set(),
              variant_floor={}),
     ),
 }
@@ -89,9 +93,9 @@ MERCHANTS = {
 SOUNDHUB = {
     "sony-wh1000xm5": dict(list_price=319.99, unit_cost=232, inventory={"black": 12, "silver": 0},
                            overstock={"black"}, variant_floor={}, standard_shipping_days=3, max_return_days=30),
-    "sennheiser-m4": dict(list_price=254.99, unit_cost=168, inventory={"black": 7, "white": 2},
+    "sennheiser-m4": dict(list_price=204.99, unit_cost=142, inventory={"black": 7, "white": 2},
                           overstock={"black"}, variant_floor={}, standard_shipping_days=3, max_return_days=30),
-    "bose-qc-ultra": dict(list_price=399.00, unit_cost=290, inventory={"black": 3, "white": 3},
+    "bose-qc-ultra": dict(list_price=429.00, unit_cost=305, inventory={"black": 3, "white": 3},
                           overstock=set(), variant_floor={}, standard_shipping_days=3, max_return_days=30),
 }
 

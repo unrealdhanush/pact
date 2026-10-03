@@ -8,6 +8,7 @@ as cached with its timestamp.
 import json
 import os
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -144,3 +145,76 @@ def integration_status() -> dict:
                 "detail": "Verifies the shopper's competitor price live; cached result if Tavily fails"}
     when = next(iter(cached.values()), {}).get("checked_at", "never")
     return {"name": "Tavily", "mode": "fallback", "detail": f"No TAVILY_API_KEY — cached competitor data ({when})"}
+
+
+# ---------------------------------------------------------------- market prices (Google-Shopping-style)
+RETAILERS = {"bestbuy.com": "Best Buy", "amazon.com": "Amazon", "walmart.com": "Walmart", "target.com": "Target",
+             "bhphotovideo.com": "B&H Photo", "crutchfield.com": "Crutchfield", "sony.com": "Sony",
+             "bose.com": "Bose", "sennheiser-hearing.com": "Sennheiser"}
+_NOT_THE_PRODUCT = re.compile(r"refurb|pre-?owned|renewed|open.box|price history|press release|\bpair\b|\bcase\b|"
+                              r"cushion|ear ?pads?|replacement|accessor|earbuds|true wireless|\bvs\.?\b|review",
+                              re.I)
+MARKET_FILE = Path(__file__).resolve().parent / "data" / "market_cache.json"
+MARKET_TTL_S = 600
+_market_mem: dict[str, tuple[float, dict]] = {}
+
+
+def _retailer(url: str) -> tuple[str, str] | None:
+    host = re.sub(r"^https?://", "", url).split("/")[0].lower()
+    if re.match(r"^(jp|eu|uk|de|fr|ca|au|in)\.", host):  # US listings only
+        return None
+    for dom, name in RETAILERS.items():
+        if host == dom or host.endswith("." + dom):
+            return dom, name
+    return None
+
+
+def _listings(results: list[dict], match: tuple[str, ...], ref_price: float) -> list[dict]:
+    out: dict[str, dict] = {}
+    for r in results:
+        who = _retailer(r.get("url", ""))
+        title = r.get("title", "")
+        key = re.sub(r"[^a-z0-9]", "", (r.get("url", "") + " " + title).lower())
+        if not who or who[0] in out or not all(t in key for t in match) or _NOT_THE_PRODUCT.search(title):
+            continue
+        prices = [float(p.replace(",", "")) for p in _PRICE.findall(title + " " + r.get("content", ""))]
+        plausible = [p for p in prices if 0.55 * ref_price <= p <= 1.45 * ref_price]
+        if plausible:
+            out[who[0]] = {"retailer": who[1], "domain": who[0], "price": plausible[0],
+                           "title": title[:90], "url": r.get("url")}
+    return sorted(out.values(), key=lambda x: x["price"])
+
+
+async def market_prices(product_id: str, name: str, query: str, match: tuple[str, ...], ref_price: float) -> dict:
+    """Live prices for one product across major US retailers, one listing per retailer, cheapest first.
+    Prices come from search snippets (labelled as such); cached 10 min; last good result is the fallback."""
+    now = time.time()
+    hit = _market_mem.get(product_id)
+    if hit and now - hit[0] < MARKET_TTL_S:
+        return {**hit[1], "cached_for_s": int(now - hit[0])}
+    key = os.environ.get("TAVILY_API_KEY")
+    saved = json.loads(MARKET_FILE.read_text()) if MARKET_FILE.exists() else {}
+    fallback = {**saved[product_id], "source": "cache"} if product_id in saved else {
+        "product": name, "listings": [], "checked_at": None, "source": "unavailable"}
+    if not key:
+        return fallback
+    t0 = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=15) as http:
+            res = await http.post(TAVILY_URL, headers={"Authorization": f"Bearer {key}"}, json={
+                "query": query, "include_domains": list(RETAILERS), "search_depth": "advanced", "max_results": 15})
+            res.raise_for_status()
+            results = res.json().get("results", [])
+    except (httpx.HTTPError, ValueError):
+        return fallback
+    listings = _listings(results, match, ref_price)
+    data = {"product": name, "listings": listings, "source": "tavily",
+            "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "ms": round((time.perf_counter() - t0) * 1000)}
+    if not listings:
+        return fallback
+    _market_mem[product_id] = (now, data)
+    saved[product_id] = data
+    MARKET_FILE.parent.mkdir(exist_ok=True)
+    MARKET_FILE.write_text(json.dumps(saved, indent=2))
+    return data

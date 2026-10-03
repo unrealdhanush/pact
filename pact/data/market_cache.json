@@ -1,0 +1,82 @@
+{
+  "sony-wh1000xm5": {
+    "product": "Sony WH-1000XM5",
+    "listings": [
+      {
+        "retailer": "Sony",
+        "domain": "sony.com",
+        "price": 299.99,
+        "title": "Sony WH-1000XM5 Premium Wireless Noise Canceling Headphones | Silver | Sony Electronics",
+        "url": "https://electronics.sony.com/audio/headphones/headband/p/wh1000xm5-s"
+      },
+      {
+        "retailer": "Best Buy",
+        "domain": "bestbuy.com",
+        "price": 299.99,
+        "title": "Sony - WH-1000XM5 Wireless Noise Cancelling Over-the- ...",
+        "url": "https://www.bestbuy.com/product/sony-wh-1000xm5-wireless-noise-cancelling-over-the-ear-headphones-black/J7XSRH5CXG"
+      },
+      {
+        "retailer": "Walmart",
+        "domain": "walmart.com",
+        "price": 309.99,
+        "title": "Sony, Wireless Noise Canceling Headphones, Black, 30-Hour Battery - Walmart.com",
+        "url": "https://www.walmart.com/ip/Sony-WH-1000XM5-The-Best-Wireless-Noise-Canceling-Headphones-Black/386006068"
+      }
+    ],
+    "source": "tavily",
+    "checked_at": "2026-10-03T21:16:01+00:00",
+    "ms": 479
+  },
+  "sennheiser-m4": {
+    "product": "Sennheiser Momentum 4",
+    "listings": [
+      {
+        "retailer": "Best Buy",
+        "domain": "bestbuy.com",
+        "price": 199.99,
+        "title": "Sennheiser MOMENTUM 4 Wireless Adaptive Noise ...",
+        "url": "https://www.bestbuy.com/product/sennheiser-momentum-4-wireless-adaptive-noise-canceling-over-the-ear-headphones-denim/J3GW2LH65F"
+      },
+      {
+        "retailer": "Walmart",
+        "domain": "walmart.com",
+        "price": 199.99,
+        "title": "Sennheiser Momentum 4 Wireless Headphones, Adaptive Noise Cancellation, 60h Battery Life, ",
+        "url": "https://www.walmart.com/ip/Sennheiser-Momentum-4-Wireless-Headphones-Bluetooth-Headset-Crystal-Clear-Calls-Adaptive-Noise-Cancellation-60h-Battery-Life-Customizable-Sound-Black/1870220056"
+      },
+      {
+        "retailer": "Sennheiser",
+        "domain": "sennheiser-hearing.com",
+        "price": 299.95,
+        "title": "Sennheiser MOMENTUM 4 Wireless Bluetooth Headphones \u2013 Sennheiser US - Sonova Consumer Hear",
+        "url": "https://us.sennheiser-hearing.com/products/momentum-4-wireless"
+      }
+    ],
+    "source": "tavily",
+    "checked_at": "2026-10-03T21:13:43+00:00",
+    "ms": 5129
+  },
+  "bose-qc-ultra": {
+    "product": "Bose QuietComfort Ultra (2nd Gen)",
+    "listings": [
+      {
+        "retailer": "Bose",
+        "domain": "bose.com",
+        "price": 449.0,
+        "title": "Shop Bose QuietComfort Ultra Headphones (2nd Gen) | Bose",
+        "url": "https://www.bose.com/p/headphones/bose-quietcomfort-ultra-headphones-2nd-gen/QCUH2-HEADPHONEARN.html"
+      },
+      {
+        "retailer": "Best Buy",
+        "domain": "bestbuy.com",
+        "price": 449.0,
+        "title": "Bose - QuietComfort Ultra Headphones (2nd Gen) - White",
+        "url": "https://www.bestbuy.com/product/bose-quietcomfort-ultra-headphones-2nd-gen-white/J7C5V6W7GS/sku/12936198/reviews"
+      }
+    ],
+    "source": "tavily",
+    "checked_at": "2026-10-03T21:13:46+00:00",
+    "ms": 2791
+  }
+}

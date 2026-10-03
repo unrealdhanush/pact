@@ -69,6 +69,21 @@ def get_integrations():
     return integrations()
 
 
+@app.get("/api/market/{product_id}")
+async def market(product_id: str):
+    """Live prices across major retailers (Tavily) next to the Pact merchant agents that can negotiate."""
+    from . import scenario
+    from .tavily import market_prices
+    if product_id not in scenario.CATALOG:
+        raise HTTPException(404, "unknown product")
+    p = scenario.product(product_id)
+    data = await market_prices(product_id, p.name, p.search, p.match, p.list_price)
+    agents = [{"name": m["name"], "band_agent": m["band_agent"],
+               "shelf_price": scenario.merchant_state(product_id, mid).list_price}
+              for mid, m in scenario.MERCHANTS.items()]
+    return {**data, "agents": agents}
+
+
 @app.post("/api/intake")
 async def intake(body: dict):
     """One turn of the human talking (voice transcript or text) to their shopper agent."""

@@ -89,11 +89,11 @@ async def test_choosing_another_product_and_price():
     it = Intake()
     await it.turn("noise-cancelling headphones in black by Tuesday")
     v = await it.choose("sennheiser-m4", max_price=280)
-    assert v["product"]["name"] == "Sennheiser Momentum 4" and v["product"]["list_price"] == 259.99
+    assert v["product"]["name"] == "Sennheiser Momentum 4" and v["product"]["list_price"] == 209.99
     assert v["fields"]["max_price"] == {**v["fields"]["max_price"], "value": 280.0, "source": "you"}
     assert "sony.com" not in v["reply"]  # the remembered Sony price doesn't apply to the Sennheiser
     s = it.shopper_state()
-    p = engine.make_proposal(s, "deal-1", "sennheiser-m4", 259.99)
-    assert p.competitor_claim is None and p.requested_price <= 259.99 * 0.9
+    p = engine.make_proposal(s, "deal-1", "sennheiser-m4", 209.99)
+    assert p.competitor_claim is None and p.requested_price <= 209.99 * 0.9
     with pytest.raises(ValueError):
         await it.choose("airpods-max")  # not sold by a reachable merchant

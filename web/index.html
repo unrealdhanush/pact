@@ -131,6 +131,16 @@ body.decision .stage { border:0; flex:1; padding:28px; }
 .track { text-align:left; margin-top:20px; }.track .steps { display:grid; grid-template-columns:repeat(5,1fr); list-style:none; padding:0; gap:5px; font-size:10px; }.track li { border-top:2px solid var(--line); padding-top:8px; }.track li.done,.track li.now { border-color:var(--shopper); }.track b { display:block; font-size:10px; }.track small,.tl { color:var(--muted); font-size:10px; }
 .opts { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin:18px 0; text-align:left; }.opt { border:1px solid var(--line); border-radius:16px; padding:16px; cursor:pointer; transition:border-color .2s,background .2s; }.opt.sel { border-color:var(--shopper); background:var(--shopper-dim); }.opt.off { opacity:.5; cursor:default; }.opt .nm { font-size:13px; font-weight:600; }.opt .sp,.opt .ref,.opt .vr { font-size:10px; color:var(--muted); margin-top:6px; }.opt .pr { font-size:24px; font-weight:600; margin-top:10px; }
 .chips2 { display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin:10px 0; }.chip2 { border-radius:999px; background:var(--panel2); color:var(--muted); padding:6px 10px; font-size:10px; }.chip2.on { background:var(--shopper-dim); color:var(--shopper); }.chips2 .lbl { color:var(--muted); font-size:10px; align-self:center; margin-right:5px; }.budget { display:flex; align-items:center; justify-content:center; gap:10px; margin:18px 0; }.budget input { max-width:40%; accent-color:var(--shopper); }
+.market { margin:6px auto 16px; max-width:640px; text-align:left; }.mk-src { text-transform:none; letter-spacing:0; }
+.mk { list-style:none; padding:0; margin:8px 0 6px; border:1px solid var(--line); border-radius:14px; overflow:hidden; background:var(--panel); }
+.mk li { display:grid; grid-template-columns:96px 1fr auto auto; gap:12px; align-items:center; padding:9px 14px; font-size:12px; border-top:1px solid var(--line); }
+.mk li:first-child { border-top:0; }.mk li.ag { background:var(--shopper-dim); }
+.mk .rt { font-weight:600; }.mk a,.mk .dom { color:var(--muted); font:11px var(--mono); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mk a:hover { color:var(--shopper); text-decoration:underline; }.mk b { font-size:14px; font-weight:600; }.mk .none { display:block; color:var(--muted); }
+.tagx { font:600 9px var(--mono); letter-spacing:.04em; padding:3px 7px; border-radius:6px; text-transform:uppercase; white-space:nowrap; }
+.tagx.static { background:var(--panel2); color:var(--muted); }.tagx.neg { background:var(--shopper); color:#fff; }
+.mk-note { font-size:10.5px; color:var(--muted); }
+@media (max-width:720px) { .mk li { grid-template-columns:1fr auto; } .mk a,.mk .dom,.mk .tagx { grid-column:1 / -1; } }
 .notice { background:var(--warn-dim); color:var(--warn); font-size:12px; padding:12px 28px; }.muted { color:var(--muted); }.ico { vertical-align:-2px; }.spin { display:inline-block; width:14px; height:14px; border:2px solid var(--line); border-top-color:var(--shopper); border-radius:50%; animation:spin 1s linear infinite; margin-right:8px; vertical-align:-2px; }
 @keyframes spin { to { transform:rotate(360deg); } } @keyframes arrive { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 @media (max-width:1000px) { main { grid-template-columns:minmax(0,1fr) 280px; gap:16px; padding:0 24px 32px; }.intro,header { padding-left:24px;padding-right:24px; }.side { padding:20px; }.decide { grid-template-columns:1fr; }.price { font-size:44px; }.flow { padding:20px; gap:8px; }.flow span { font-size:10px; }.flow b { display:none; }.stage { padding:20px; } }
@@ -624,6 +634,7 @@ function renderOptions(v) {
   const max = f.max_price?.value ?? 300, src = f.max_price?.source || "default";
   $("stage").innerHTML = `<div class="k">Your agent found ${v.options.filter(o => o.carried).length} options · pick one</div>
     ${controls}<div class="opts">${cards}</div>
+    <div class="market" id="market"><div class="k"><span class="spin"></span>Checking live prices across the web…</div></div>
     <div class="budget"><span class="k">Max I'll pay</span>
       <input type="range" id="maxPrice" min="150" max="500" step="5" value="${max}" />
       <b id="maxLabel">${money(max)}</b><span class="src ${src}">${src === "you" ? "YOU" : src.toUpperCase()}</span></div>
@@ -636,8 +647,27 @@ function renderOptions(v) {
   r.oninput = () => $("maxLabel").textContent = money(+r.value);
   r.onchange = () => choose(sel, +r.value);
   $("startBtn").onclick = () => start(intake.intake_id);
+  loadMarket(sel);
   document.querySelectorAll("[data-sort]").forEach(b => b.onclick = () => { sortBy = b.dataset.sort; renderOptions(intake); });
   document.querySelectorAll("[data-pref]").forEach(b => b.onclick = () => { prefer = b.dataset.pref; renderOptions(intake); });
+}
+const marketCache = {};
+async function loadMarket(pid) {
+  if (!pid) return;
+  const m = marketCache[pid] || await fetch(`/api/market/${pid}`).then(r => r.ok ? r.json() : null).catch(() => null);
+  if (!m || !$("market")) return;
+  marketCache[pid] = m;
+  const host = u => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
+  const src = m.source === "tavily" ? `live · Tavily${m.ms ? ` · ${(m.ms / 1000).toFixed(1)} s` : ""}`
+            : m.source === "cache" ? `cached ${m.checked_at ? new Date(m.checked_at).toLocaleTimeString() : ""}` : "unavailable";
+  const rows = m.listings.map(l => `<li><span class="rt">${esc(l.retailer)}</span>
+      <a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" title="${esc(l.title)}">${esc(host(l.url))}</a>
+      <b>${money(l.price)}</b><span class="tagx static">static price · no agent</span></li>`).join("");
+  const agents = (m.agents || []).map(a => `<li class="ag"><span class="rt">${esc(a.name)}</span><span class="dom">@${esc(a.band_agent)} on BAND</span>
+      <b>${money(a.shelf_price)}</b><span class="tagx neg">Pact agent · negotiable</span></li>`).join("");
+  $("market").innerHTML = `<div class="k">Prices across the web · <span class="mk-src">${esc(src)}</span></div>
+    <ul class="mk">${rows || `<li class="none">No live listings found right now.</li>`}${agents}</ul>
+    <div class="mk-note">Web prices come from search results and may differ at checkout. Retailers become negotiable by running a Pact merchant agent.</div>`;
 }
 async function choose(productId, maxPrice) {
   const r = await fetch(`/api/intake/${intake.intake_id}/choose`, { method: "POST", headers: { "Content-Type": "application/json" },
