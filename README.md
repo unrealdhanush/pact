@@ -23,9 +23,9 @@ The header shows one badge per sponsor integration: green **LIVE** or amber **SI
 | Integration | Live when | Fallback |
 |---|---|---|
 | **BAND** (deal room) | `BAND_HUMAN_API_KEY` (registers ShopperAgent + MerchantAgent once and caches their keys in gitignored `.env.band`) **or** `BAND_SHOPPER_AGENT_KEY` + `BAND_MERCHANT_AGENT_KEY` | In-process room, "local (simulated)". If BAND fails mid-deal the room degrades to local delivery and says so. |
-| **Jev** (authority gate) | `pact/authority.py` (merchant side) exposes `check_authority` and `JEV_API_KEY` is set (see [Jev setup](#jev-setup-typesafe-ai)) | Deterministic local policy rules in `pact/gate.py`, shown as "Jev live decision service unavailable — local policy rules". |
-| **ZooWork** (merchant runtime) | `pact/zoowork.py` exposes `integration_status()` | Local merchant agent on the deterministic engine. |
-| **Tavily** (competitor price) | `pact/tavily.py` exposes `integration_status()` | No competitor check shown. |
+| **Jev** (authority gate) | `JEV_API_KEY` or `TYPESAFE_API_KEY` set (see [Jev setup](#jev-setup-typesafe-ai)). `pact/authority.py` → `pact/jev.py`: one Choice decision + a Noul risk check on the BAND transcript (flags manipulation / prompt injection) | Deterministic local policy rules in `pact/gate.py`, shown as "Jev live decision service unavailable — local policy rules". |
+| **ZooWork** (merchant runtime) | `ZOOWORK_API_KEY` + agent created once with `uv run python -m pact.zoowork_setup` (id in gitignored `.local/zoowork.json`; `--update` after changing its instructions/tools) | Local merchant agent on the deterministic engine; also used per turn if ZooWork errors or times out. |
+| **Tavily** (competitor price) | `TAVILY_API_KEY`: the merchant's `verify_competitor_price` tool checks the shopper's cited price live | Last good live result from `pact/data/competitor_cache.json`, labelled *cached* with its timestamp. |
 
 Checkout and inventory reservation are always simulated (no payments).
 
@@ -89,13 +89,15 @@ Keys created at the jevtypesafeai.com gateway (`jv_live_…`) are a different se
 
 ## Demo script (≈2 min)
 
-1. "Humans set intent and boundaries." Point at the two private columns: shopper wants black,
-   ≤ $220, by Tuesday, asks for approval above $200; merchant has 2 black / 17 silver and a margin floor.
-2. Start. The agents negotiate in `#DEAL-1842`: $215 black → black held at $235, silver $219 with
-   free next-day → shopper takes silver if returns go to 45 days → merchant accepts.
+1. "Humans set intent and boundaries." Point at the two private columns: shopper wants a Sony WH-1000XM5
+   in black, ≤ $300, by Tuesday, asks for approval above $250, and found it at sony.com for $299.99;
+   merchant (shelf $329.99) has 2 black / 17 silver, an 18% margin floor and a 10% discount cap.
+2. Start. The agents negotiate in `#DEAL-1842`: $279 black + "sony.com has it for $299.99" → the merchant
+   (on ZooWork) verifies sony.com live with **Tavily** → black held at $319.99, silver price-matched at
+   $299.99 with free next-day → shopper takes silver if returns go to 45 days → merchant accepts.
 3. "Pact checks authority." Jev gate: merchant rules PASS, shopper rules APPROVAL REQUIRED,
-   decision HUMAN APPROVAL REQUIRED, because $219 is above the $200 auto-approve limit.
-4. Open "Why this deal?", then press **APPROVE $219** → TRANSACTION COMPLETE.
+   decision HUMAN APPROVAL REQUIRED, because $299.99 is above the $250 auto-approve limit.
+4. Open "Why this deal?", then press **APPROVE $299.99** → TRANSACTION COMPLETE.
 5. "Humans define intent. Agents negotiate. Pact checks authority. Humans stay in control."
 
 ## Layout
@@ -105,7 +107,10 @@ Keys created at the jevtypesafeai.com gateway (`jv_live_…`) are a different se
 | `pact/protocol.py` | Wire contracts (Proposal, Counteroffer, ConditionalAccept, MerchantAccept, Agreement). Only these cross the room. |
 | `pact/scenario.py` | Mocked product + private shopper/merchant state. |
 | `pact/engine.py` | Deterministic negotiation logic. Decides all terms. |
-| `pact/agents/` | Shopper and merchant agents. `merchant_tools.py` = the tools the ZooWork agent gets. |
+| `pact/agents/` | Shopper and merchant agents. `zoowork_merchant.py` = ZooWork-hosted merchant (instructions + custom tools, leak guard, local fallback); `merchant_tools.py` = its tools. |
+| `pact/zoowork.py`, `pact/zoowork_setup.py` | ZooWork REST client (no official Python SDK) and one-time agent setup. |
+| `pact/tavily.py` | Competitor price verification (live Tavily, timestamped cached fallback). |
+| `pact/authority.py`, `pact/jev.py` | Live authority check for the gate: policy facts in code + Jev decision and transcript risk; can only tighten. |
 | `pact/transport.py` | `Room` interface + `LocalRoom` (simulated fallback). |
 | `pact/band.py` | `BandRoom`: BAND Agent API + WebSocket transport, agent bootstrap, `python -m pact.band check`. |
 | `pact/gate.py` | Authority gate seam: calls `pact/authority.py` if present, else local rules; never looser than local rules. |
@@ -117,7 +122,8 @@ Keys created at the jevtypesafeai.com gateway (`jv_live_…`) are a different se
 
 ```python
 # pact/authority.py
-async def check_authority(agreement, shopper_state, merchant_state) -> AuthorityDecision | dict
+async def check_authority(agreement, shopper_state, merchant_state, transcript=None) -> AuthorityDecision | dict
+#   (transcript is optional: the gate passes it only if the signature accepts it)
 #   {transaction_id, decision: AUTO_APPROVE|HUMAN_APPROVAL_REQUIRED|REJECT, merchant_policy_ok,
 #    shopper_policy_ok, reason, checks: [{side, rule, ok, detail}], source: "jev"|"local", jev_raw}
 def integration_status() -> dict   # {"name": "Jev", "mode": "live"|"fallback", "detail": "..."}

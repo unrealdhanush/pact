@@ -50,7 +50,7 @@ async def test_hero_requires_human_then_completes():
 
 
 async def test_auto_approve_executes_without_human(monkeypatch):
-    async def auto(agreement, shopper, merchant, timeout=8.0):
+    async def auto(agreement, shopper, merchant, timeout=8.0, **_):
         d = gate.local_decision(agreement, shopper, merchant)
         return {**d, "decision": "AUTO_APPROVE", "shopper_policy_ok": True, "reason": "test", "source_label": "t"}
     monkeypatch.setattr(gate, "evaluate", auto)
@@ -63,7 +63,7 @@ async def test_auto_approve_executes_without_human(monkeypatch):
 
 
 async def test_reject_fails_deal(monkeypatch):
-    async def reject(agreement, shopper, merchant, timeout=8.0):
+    async def reject(agreement, shopper, merchant, timeout=8.0, **_):
         return {**gate.local_decision(agreement, shopper, merchant), "decision": "REJECT",
                 "reason": "risk flag", "source_label": "t"}
     monkeypatch.setattr(gate, "evaluate", reject)
@@ -80,9 +80,9 @@ def test_local_rules_reject_over_budget():
     from pact.protocol import Agreement, Offer
     from pact.scenario import MerchantState, ShopperState
     s = ShopperState()
-    terms = Offer(price=229, variant="silver", shipping="free_next_day", delivery_date=date.today(),
-                  return_window_days=45)
-    a = Agreement(transaction_id="deal-1", terms=terms, list_price=249, shopper_savings=20,
+    terms = Offer(price=310, variant="silver", shipping="free_next_day", delivery_date=date.today(),
+                  return_window_days=45)  # $310 > $300 shopper budget; fine for the merchant
+    a = Agreement(transaction_id="deal-1", terms=terms, list_price=329.99, shopper_savings=19.99,
                   human_approval_required=True)
     d = gate.local_decision(a, s, MerchantState())
     assert d["decision"] == "REJECT" and "budget" in d["reason"].lower()

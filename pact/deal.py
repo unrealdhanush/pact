@@ -1,6 +1,7 @@
 """One negotiation: room + both agents + authority gate + an event log the UI streams."""
 import asyncio
 import logging
+import os
 import random
 import time
 from dataclasses import asdict
@@ -9,10 +10,13 @@ from typing import Literal
 from . import gate
 from .agents.merchant import MerchantAgent
 from .agents.shopper import ShopperAgent
+from .agents.zoowork_merchant import ZooWorkMerchantAgent
 from .band import BandConfig, BandRoom, bootstrap_agents
 from .protocol import Agreement, RoomMessage
 from .scenario import MerchantState, Product, ShopperState
+from .engine import money
 from .transport import LocalRoom
+from .zoowork import load_agent_id
 
 log = logging.getLogger("pact.deal")
 
@@ -94,7 +98,13 @@ class Deal:
         self.room.subscribe(self._on_room_message)
         self.shopper = ShopperAgent(self.room, self._trace, self.shopper_state, self.product,
                                     on_agreement=self._on_agreement, pace=self.pace)
-        self.merchant = MerchantAgent(self.room, self._trace, self.merchant_state, self.product, pace=self.pace)
+        zoowork_id = load_agent_id() if os.environ.get("PACT_MERCHANT", "zoowork") == "zoowork" else None
+        if zoowork_id:  # ZooWork runs the merchant's reasoning; falls back to local logic per turn on failure
+            self.merchant = ZooWorkMerchantAgent(self.room, self._trace, self.merchant_state, self.product,
+                                                 agent_id=zoowork_id, pace=self.pace)
+        else:
+            self.merchant = MerchantAgent(self.room, self._trace, self.merchant_state, self.product,
+                                          pace=self.pace)
         self.emit("room", room=self.room.status())
 
     async def run(self) -> None:
@@ -119,7 +129,9 @@ class Deal:
         if self.pace:
             await asyncio.sleep(min(self.pace, 1.0))
         try:
-            decision = await gate.evaluate(agreement, self.shopper_state, self.merchant_state)
+            transcript = [f"{m.sender}: {m.text}" for m in self.room.history]
+            decision = await gate.evaluate(agreement, self.shopper_state, self.merchant_state,
+                                           transcript=transcript)
         except Exception as e:  # noqa: BLE001 - fail closed
             log.exception("authority gate crashed")
             decision = {**gate.local_decision(agreement, self.shopper_state, self.merchant_state),
@@ -189,7 +201,7 @@ class Deal:
         reservation = tools.reserve_inventory(terms.variant)
         self._trace("merchant", "tool", f"reserve_inventory({terms.variant}) → {reservation['remaining']} left")
         checkout = tools.create_checkout(terms)
-        self._trace("merchant", "tool", f"create_checkout(${terms.price:.0f}) → {checkout['order_id']}")
+        self._trace("merchant", "tool", f"create_checkout({money(terms.price)}) → {checkout['order_id']}")
         self.status = "complete"
         self.execution = {"order_id": checkout["order_id"], "amount": checkout.get("amount", terms.price),
                           "simulated": bool(checkout.get("simulated", True)), "approved_by": approved_by,
@@ -200,7 +212,7 @@ class Deal:
         if self.room is not None:
             who = "the shopper's human" if approved_by == "human" else "policy (auto-approve)"
             self._spawn(self.room.post_event(
-                f"Approved by {who}. Checkout {checkout['order_id']} for ${terms.price:.0f}"
+                f"Approved by {who}. Checkout {checkout['order_id']} for {money(terms.price)}"
                 f"{' (simulated — no real payment)' if self.execution['simulated'] else ''}.",
                 "task", {"order_id": checkout["order_id"], "approved_by": approved_by,
                          "simulated": self.execution["simulated"]}))

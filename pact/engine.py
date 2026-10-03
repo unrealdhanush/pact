@@ -7,15 +7,19 @@ import math
 from datetime import date, timedelta
 
 from .protocol import (
-    Agreement, ConditionalAccept, Counteroffer, MerchantAccept, Offer, Proposal, Rejection,
+    Agreement, CompetitorClaim, ConditionalAccept, Counteroffer, MerchantAccept, Offer, Proposal, Rejection,
 )
 from .scenario import MerchantState, ShopperState
+from .tavily import CompetitorCheck
 
 
-def charm_up(x: float) -> int:
-    """Round up to the next price ending in 9 (216.63 -> 219)."""
-    n = math.ceil(x)
-    return n + (9 - n % 10) % 10
+def price_point(x: float) -> float:
+    """Round up to the next price ending in .99 (296.99 -> 296.99, 313.49 -> 313.99)."""
+    return round(math.ceil(round(x - 0.99, 6)) + 0.99, 2)
+
+
+def money(x: float) -> str:
+    return f"${x:,.2f}".replace(".00", "")
 
 
 # ---------------------------------------------------------------- merchant
@@ -46,24 +50,40 @@ def within_authority(m: MerchantState, offer: Offer) -> bool:
 
 
 def evaluate_proposal(
-    m: MerchantState, p: Proposal, today: date
+    m: MerchantState, p: Proposal, today: date, competitor: CompetitorCheck | None = None
 ) -> tuple[Counteroffer | Rejection, list[str]]:
+    """Scarce variants hold their floor. Overstock leads with a promo price, or price-matches a
+    competitor price verified by Tavily, never below margin floor or discount authority."""
     notes: list[str] = []
     standard_arrival = today + timedelta(days=m.standard_shipping_days)
     if standard_arrival <= p.delivery_deadline:
         shipping, arrival, ship_cost = "standard", standard_arrival, 0.0
     else:
         shipping, arrival, ship_cost = "free_next_day", today + timedelta(days=1), m.next_day_shipping_cost
-        notes.append(f"Standard shipping misses the deadline; next-day costs us ${ship_cost:.0f}")
+        notes.append(f"Standard shipping misses the deadline; next-day costs us {money(ship_cost)}")
 
     returns = max(m.standard_return_days, p.minimum_return_days)
-    authority_min = charm_up(m.list_price * (1 - m.max_auto_discount_pct / 100))
-    margin_min = m.unit_cost / (1 - m.min_margin_pct / 100) + ship_cost
-    if p.requested_price < authority_min:
+    authority_min = price_point(m.list_price * (1 - m.max_auto_discount_pct / 100))
+    margin_min = price_point(m.unit_cost / (1 - m.min_margin_pct / 100) + ship_cost)
+    lowest = max(authority_min, margin_min)
+    promo = max(lowest, price_point(m.list_price * (1 - m.max_auto_discount_pct / 200)))
+    if p.requested_price < lowest:
         notes.append(
-            f"${p.requested_price:.0f} is {discount_pct(m, p.requested_price):.1f}% off — "
+            f"{money(p.requested_price)} is {discount_pct(m, p.requested_price):.1f}% off — "
             f"beyond my {m.max_auto_discount_pct:.0f}% autonomous authority"
         )
+    match = None
+    if competitor is not None:
+        where = "cached" if competitor.source == "cache" else "live"
+        if competitor.verified and competitor.found_price >= lowest:
+            match = competitor.found_price
+            notes.append(f"{competitor.retailer} at {money(match)} verified ({where}) — price-match allowed")
+        elif competitor.verified:
+            notes.append(f"{competitor.retailer} at {money(competitor.found_price)} verified but below my "
+                         f"authority — can't fully match")
+        else:
+            notes.append(f"{competitor.retailer} claim of {money(competitor.claimed_price)} not verified — "
+                         f"no price match")
 
     ordered = [p.preferred_variant] + [v for v in p.acceptable_variants if v != p.preferred_variant]
     offers: list[Offer] = []
@@ -73,17 +93,19 @@ def evaluate_proposal(
             notes.append(f"{v}: out of stock")
             continue
         floor = m.variant_floor.get(v, 0)
-        price = max(p.requested_price, authority_min, charm_up(margin_min), floor)
+        base = floor or (match if match is not None and v in m.overstock else promo)
+        price = max(p.requested_price, lowest, base)
         offer = Offer(price=price, variant=v, shipping=shipping,
                       delivery_date=arrival, return_window_days=returns)
         if not within_authority(m, offer):
             notes.append(f"{v}: no offer inside my authority")
             continue
         if floor:
-            notes.append(f"{v}: only {stock} left — held at ${floor:.0f} scarcity floor")
+            notes.append(f"{v}: only {stock} left — held at {money(floor)} scarcity floor")
         elif v in m.overstock:
-            notes.append(f"{v}: {stock} units overstocked — lead with deepest authorised price")
-        notes.append(f"{v} @ ${price:.0f}: margin {margin_pct(m, offer):.1f}% (floor {m.min_margin_pct:.0f}%)")
+            notes.append(f"{v}: {stock} units overstocked — " +
+                         ("match the verified competitor" if match is not None else "lead with promo price"))
+        notes.append(f"{v} @ {money(price)}: margin {margin_pct(m, offer):.1f}% (floor {m.min_margin_pct:.0f}%)")
         offers.append(offer)
 
     if not offers:
@@ -91,6 +113,8 @@ def evaluate_proposal(
                          reason="No terms available within merchant policy"), notes
 
     explanation = []
+    if match is not None:
+        explanation.append(f"Price-matched the verified {competitor.retailer} price")
     if any(o.variant in m.overstock for o in offers):
         explanation.append("Best pricing is on the variant we have in depth")
     if shipping == "free_next_day":
@@ -98,6 +122,7 @@ def evaluate_proposal(
     return Counteroffer(
         transaction_id=p.transaction_id, offers=offers, merchant_margin_valid=True,
         requires_human_approval=False, explanation=explanation,
+        competitor_check=competitor.model_dump() if competitor else None,
     ), notes
 
 
@@ -129,12 +154,14 @@ def make_proposal(s: ShopperState, transaction_id: str, product_id: str) -> Prop
         acceptable_variants=[s.preferred_variant, *s.fallback_variants],
         delivery_deadline=s.delivery_deadline, minimum_return_days=s.minimum_return_days,
         requires_human_approval=True,
+        competitor_claim=CompetitorClaim(retailer=s.competitor_retailer, price=s.competitor_price)
+        if s.competitor_retailer and s.competitor_price else None,
     )
 
 
 def _meets_basics(s: ShopperState, o: Offer) -> str | None:
     if o.price > s.max_price:
-        return f"{o.variant} @ ${o.price:.0f} is over my ${s.max_price:.0f} budget"
+        return f"{o.variant} @ {money(o.price)} is over my {money(s.max_price)} budget"
     if o.delivery_date > s.delivery_deadline:
         return f"{o.variant} arrives {o.delivery_date}, after the deadline"
     if o.return_window_days < s.minimum_return_days:
@@ -157,7 +184,7 @@ def evaluate_counteroffer(
 
     for o in viable:
         if o.variant == s.preferred_variant:
-            notes.append(f"{o.variant} @ ${o.price:.0f} meets every boundary")
+            notes.append(f"{o.variant} @ {money(o.price)} meets every boundary")
             return ConditionalAccept(transaction_id=c.transaction_id, offer=o, conditions={}), notes
 
     for o in viable:
@@ -183,10 +210,10 @@ def finalize(s: ShopperState, transaction_id: str, terms: Offer, list_price: flo
     needs_human = terms.price >= s.approval_required_above
     notes = [
         "Final terms are inside every boundary",
-        f"${terms.price:.0f} ≥ ${s.approval_required_above:.0f} auto-approve limit — human sign-off required"
-        if needs_human else f"${terms.price:.0f} under auto-approve limit",
+        f"{money(terms.price)} ≥ {money(s.approval_required_above)} auto-approve limit — human sign-off required"
+        if needs_human else f"{money(terms.price)} under auto-approve limit",
     ]
     return Agreement(
         transaction_id=transaction_id, terms=terms, list_price=list_price,
-        shopper_savings=list_price - terms.price, human_approval_required=needs_human,
+        shopper_savings=round(list_price - terms.price, 2), human_approval_required=needs_human,
     ), notes

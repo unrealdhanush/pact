@@ -17,6 +17,7 @@ class Agent:
         self._trace = trace
         self.pace = pace
         self.reasons: list[str] = []  # surfaced in "Why this deal?"
+        self.last_message: RoomMessage | None = None
         room.subscribe(self._dispatch)
 
     def think(self, text: str) -> None:
@@ -31,6 +32,7 @@ class Agent:
     async def _dispatch(self, msg: RoomMessage) -> None:
         if msg.sender == self.name or self.name not in msg.mentions or not msg.payload:
             return
+        self.last_message = msg
         await self.handle(payload_adapter.validate_python(msg.payload))
 
     async def handle(self, payload) -> None:

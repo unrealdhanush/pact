@@ -7,6 +7,9 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "pydantic>=2.7",
+    "httpx>=0.28.1",
+    "python-dotenv>=1.2.4",
+    "band-sdk>=4.0.0",
 ]
 
 [dependency-groups]

@@ -7,6 +7,7 @@ contract with deterministic local rules and labels the result `source="local"`.
 The final decision is never looser than the local rules.
 """
 import asyncio
+import inspect
 import logging
 from typing import Literal
 
@@ -40,7 +41,7 @@ def local_decision(agreement: Agreement, shopper: ShopperState, merchant: Mercha
         {"side": "merchant", "rule": "Variant price floor",
          "ok": t.price >= merchant.variant_floor.get(t.variant, 0),
          "detail": f"{t.variant} has no scarcity floor" if t.variant not in merchant.variant_floor
-         else f"floor ${merchant.variant_floor[t.variant]:.0f}"},
+         else f"floor {engine.money(merchant.variant_floor[t.variant])}"},
         {"side": "merchant", "rule": "Return window within policy",
          "ok": t.return_window_days <= merchant.max_return_days,
          "detail": f"{t.return_window_days} days (max {merchant.max_return_days})"},
@@ -49,7 +50,7 @@ def local_decision(agreement: Agreement, shopper: ShopperState, merchant: Mercha
     ]
     shopper_hard = [
         {"side": "shopper", "rule": "Within budget", "ok": t.price <= shopper.max_price,
-         "detail": f"${t.price:.0f} of ${shopper.max_price:.0f} max"},
+         "detail": f"{engine.money(t.price)} of {engine.money(shopper.max_price)} max"},
         {"side": "shopper", "rule": "Acceptable variant", "ok": t.variant in acceptable,
          "detail": f"{t.variant} ({'preferred' if t.variant == shopper.preferred_variant else 'fallback'})"},
         {"side": "shopper", "rule": "Arrives by deadline", "ok": t.delivery_date <= shopper.delivery_deadline,
@@ -59,7 +60,7 @@ def local_decision(agreement: Agreement, shopper: ShopperState, merchant: Mercha
     ]
     needs_human = t.price >= shopper.approval_required_above
     threshold = {"side": "shopper", "rule": "Auto-approval threshold", "ok": not needs_human,
-                 "detail": f"${t.price:.0f} vs ${shopper.approval_required_above:.0f} auto-approve limit"}
+                 "detail": f"{engine.money(t.price)} vs {engine.money(shopper.approval_required_above)} auto-approve limit"}
 
     merchant_ok = all(c["ok"] for c in merchant_checks)
     shopper_hard_ok = all(c["ok"] for c in shopper_hard)
@@ -87,13 +88,15 @@ def _as_dict(d) -> dict:
 
 
 async def evaluate(agreement: Agreement, shopper: ShopperState, merchant: MerchantState,
-                   timeout: float = 8.0) -> dict:
+                   timeout: float = 8.0, transcript: list[str] | None = None) -> dict:
     local = local_decision(agreement, shopper, merchant)
     check = getattr(_authority, "check_authority", None)
     if check is None:
         return {**local, "source_label": LOCAL_LABEL}
     try:
-        remote = _as_dict(await asyncio.wait_for(check(agreement, shopper, merchant), timeout))
+        # The transcript (for Jev's risk check) is optional to the authority contract.
+        kw = {"transcript": transcript} if "transcript" in inspect.signature(check).parameters else {}
+        remote = _as_dict(await asyncio.wait_for(check(agreement, shopper, merchant, **kw), timeout))
     except Exception as e:  # noqa: BLE001 - any failure falls back to local rules
         log.warning("authority.check_authority failed: %s", e)
         return {**local, "source_label": f"{LOCAL_LABEL} ({type(e).__name__})"}
