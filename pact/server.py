@@ -1,5 +1,6 @@
 import asyncio
 import importlib
+from datetime import date
 import json
 import re
 from dataclasses import asdict
@@ -15,6 +16,9 @@ load_dotenv(ROOT / ".env.band")  # BAND agent keys auto-registered by pact.band
 
 from . import band, gate  # noqa: E402  (after load_dotenv so adapters see the keys)
 from .deal import DealStore, _jsonable  # noqa: E402
+from .engine import money  # noqa: E402
+from .intake import IntakeStore  # noqa: E402
+from .memory import memory  # noqa: E402
 from .scenario import MerchantState, Product, ShopperState  # noqa: E402
 
 WEB = ROOT / "web"
@@ -22,11 +26,18 @@ DEAL_ID = re.compile(r"^deal-\d{4}$")
 
 app = FastAPI(title="Pact")
 store = DealStore()
+intakes = IntakeStore()
+
+
+@app.on_event("startup")
+async def _warm_memory():
+    asyncio.create_task(memory.load())  # Moss indexes load in the background (~10 s), queries are then in-process
 
 # Adapters owned by the merchant side; reported as fallback until they exist.
 OPTIONAL_ADAPTERS = {
     "ZooWork": ("pact.zoowork", "local merchant agent — deterministic engine (simulated)"),
     "Tavily": ("pact.tavily", "no live competitor check — not integrated yet"),
+    "Moss": ("pact.memory", "no shopper memory — local keyword fallback (simulated)"),
 }
 
 
@@ -58,12 +69,43 @@ def get_integrations():
     return integrations()
 
 
+@app.post("/api/intake")
+async def intake(body: dict):
+    """One turn of the human talking (voice transcript or text) to their shopper agent."""
+    text = str(body.get("text", "")).strip()
+    if not text:
+        raise HTTPException(422, "text is required")
+    return await intakes.get_or_new(body.get("intake_id")).turn(text)
+
+
+async def _remember_outcome(deal) -> None:
+    """Moss write-back: the next conversation recalls how this deal ended."""
+    t = deal.agreement.terms
+    note = (f"Bought the {deal.product.name} in {t.variant} for {money(t.price)} with "
+            f"{'free next-day delivery' if t.shipping == 'free_next_day' else 'standard shipping'} and "
+            f"{t.return_window_days}-day returns on {date.today():%b %d} "
+            f"(Pact {deal.id}).")
+    if t.variant != deal.shopper_state.preferred_variant:
+        note += (f" Accepted {t.variant} instead of {deal.shopper_state.preferred_variant} "
+                 f"for the {t.return_window_days}-day return window.")
+    where = await memory.remember(f"outcome-{deal.id}", note, {"last_purchase": {
+        "product": deal.product.name, "variant": t.variant, "price": t.price}})
+    deal.emit("memory", stored=where, text=note)
+
+
 @app.post("/api/deals")
-async def create_deal(pace: float = 1.2, id: str | None = None):
+async def create_deal(pace: float = 1.2, id: str | None = None, intake: str | None = None):
     if id is not None and not DEAL_ID.match(id):
         raise HTTPException(422, "id must look like deal-1842")
-    deal = await store.create(pace=pace, deal_id=id)
-    return {**deal.snapshot(), "integrations": integrations()}
+    shopper_state, on_complete = None, None
+    if intake:
+        it = intakes.items.get(intake)
+        if it is None or not it.product or not it.product.get("carried"):
+            raise HTTPException(409, "intake is not ready: no product this merchant carries")
+        shopper_state, on_complete = it.shopper_state(), _remember_outcome
+    deal = await store.create(pace=pace, deal_id=id, shopper_state=shopper_state, on_complete=on_complete)
+    return {**deal.snapshot(), "integrations": integrations(),
+            "intake": intakes.items[intake].view("")["fields"] if intake else None}
 
 
 def _get(deal_id: str):

@@ -10,6 +10,7 @@ dependencies = [
     "httpx>=0.28.1",
     "python-dotenv>=1.2.4",
     "band-sdk>=4.0.0",
+    "moss>=1.14.0",
 ]
 
 [dependency-groups]

@@ -46,6 +46,26 @@
   .trace .think::before { content: "› "; color: var(--muted); }
   .shopper .trace .think::before { color: var(--shopper); }
 
+  /* shopper intake (Moss) ---------------------------------------------------- */
+  .talk { margin: 10px 14px 0; border: 1px solid var(--line); border-radius: 12px; background: #12151a; display: flex; flex-direction: column; max-height: 42vh; }
+  .talk .convo { overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; min-height: 40px; }
+  .talk .b { font-size: 13px; line-height: 1.4; padding: 7px 10px; border-radius: 10px; max-width: 92%; animation: in .25s ease; }
+  .talk .b.you { align-self: flex-end; background: #23303a; }
+  .talk .b.agent { align-self: flex-start; background: var(--shopper-dim); border: 1px solid rgba(79,209,197,.28); }
+  .talk .hint { color: var(--muted); font-size: 12px; padding: 2px 2px 4px; }
+  .talk form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
+  .talk input { flex: 1; min-width: 0; background: #0d0f12; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px; }
+  .talk input:focus { outline: none; border-color: var(--shopper); }
+  .mic { width: 36px; border-radius: 8px; background: #1c2128; color: var(--text); font-size: 15px; }
+  .mic.on { background: var(--shopper); color: #0d0f12; animation: pulse 1.2s infinite; }
+  .mems { padding: 0 18px; font-size: 12px; }
+  .mems div { padding: 4px 0; color: #b8c0cc; border-bottom: 1px dashed #1f232a; animation: in .3s ease; }
+  .mems .ms { font: 11px var(--mono); color: var(--shopper); margin-left: 6px; }
+  .src { font: 600 9px var(--mono); letter-spacing: .06em; padding: 1px 5px; border-radius: 4px; margin-left: 6px; vertical-align: 1px; }
+  .src.you { background: #23303a; color: #cfe3f0; }
+  .src.memory { background: var(--shopper-dim); color: var(--shopper); }
+  .src.default { background: #222730; color: var(--muted); }
+
   /* center ---------------------------------------------------------------- */
   .center { padding: 0; overflow: hidden; }
   .path { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; row-gap: 8px; padding: 12px 18px 10px; border-bottom: 1px solid var(--line); min-height: 60px; }
@@ -150,6 +170,15 @@
   <section class="side shopper">
     <h2><span class="dot"></span>Shopper Agent</h2>
     <div class="sub">Acts for the buyer · @ShopperAgent</div>
+    <div class="talk">
+      <div class="convo" id="convo"><div class="hint">Tell your agent what you want. Try: “Find me Sony noise-cancelling headphones in black, under 300, by Tuesday.”</div></div>
+      <form id="talkForm" autocomplete="off">
+        <button type="button" class="mic" id="micBtn" title="Speak (Chrome)">🎙</button>
+        <input id="talkInput" placeholder="Type or press 🎙 and speak…" />
+      </form>
+    </div>
+    <div class="label" id="memLabel" hidden>Recalled from memory <span class="lock">MOSS</span></div>
+    <div class="mems" id="mems"></div>
     <div class="label">Owner's goals &amp; bounds <span class="lock">PRIVATE</span></div>
     <dl id="shopperRules"></dl>
     <div class="label">Agent reasoning <span class="lock">PRIVATE</span></div>
@@ -187,7 +216,7 @@ let deal = null, source = null, listPrice = 0, why = [], agreement = null, autho
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const money = n => "$" + (Number.isInteger(+n) ? n : (+n).toFixed(2));
 const shipLabel = s => s === "free_next_day" ? "Free next-day" : "Standard shipping";
-const day = iso => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" });
+const day = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" }) : "—";
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : "";
 const LABEL = { AUTO_APPROVE: "AUTO-APPROVE", HUMAN_APPROVAL_REQUIRED: "HUMAN APPROVAL REQUIRED", REJECT: "REJECT" };
 
@@ -217,17 +246,18 @@ function renderRoomMode(room) {
   renderChips(null, room);
 }
 
-function renderRules(snap) {
+function renderRules(snap, prov = null) {
   const s = snap.shopper, m = snap.merchant;
+  const tag = key => prov ? (src => `<span class="src ${src}">${src === "you" ? "YOU" : src === "memory" ? "MEMORY" : "DEFAULT"}</span>`)(prov[key]?.source || "default") : "";
   $("shopperRules").innerHTML = [
-    ["Max price", money(s.max_price)],
-    ["Preferred", cap(s.preferred_variant)],
-    ["Also OK", s.fallback_variants.map(cap).join(", ") + ` (if ${s.fallback_return_days}-day returns)`],
-    ["Deliver by", day(s.delivery_deadline)],
-    ["Min returns", s.minimum_return_days + " days"],
-    ["Ask me above", money(s.approval_required_above)],
-    ...(s.competitor_price ? [["Found elsewhere", `${money(s.competitor_price)} at ${s.competitor_retailer}`]] : []),
-  ].map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
+    ["Max price", money(s.max_price), "max_price"],
+    ["Preferred", cap(s.preferred_variant), "preferred_variant"],
+    ["Also OK", s.fallback_variants.map(cap).join(", ") + ` (if ${s.fallback_return_days}-day returns)`, "fallback_variants"],
+    ["Deliver by", day(s.delivery_deadline), "delivery_deadline"],
+    ["Min returns", s.minimum_return_days + " days", "minimum_return_days"],
+    ["Ask me above", money(s.approval_required_above), "approval_required_above"],
+    ...(s.competitor_price ? [["Found elsewhere", `${money(s.competitor_price)} at ${s.competitor_retailer}`, "competitor_price"]] : []),
+  ].map(([k, v, key]) => `<dt>${k}</dt><dd>${esc(v)}${tag(key)}</dd>`).join("");
   $("merchantRules").innerHTML = [
     ["List price", money(m.list_price)],
     ["Min margin", m.min_margin_pct + "%"],
@@ -392,18 +422,19 @@ function onStatus(e) {
   if (e.status === "failed") { pushStep("BLOCKED", "", "bad"); showBlocked(e); }
 }
 
-async function start() {
+async function start(intakeId = null) {
   if (source) source.close();
   document.body.classList.remove("decision");
   agreement = authority = null; why = []; steps = [];
   ["room", "shopperTrace", "merchantTrace"].forEach(id => $(id).innerHTML = "");
   $("stage").innerHTML = `<div class="k"><span class="spin"></span>Opening deal room…</div>`;
-  const res = await fetch(`/api/deals?pace=${pace}&id=${encodeURIComponent(dealParam)}`, { method: "POST" });
+  const res = await fetch(`/api/deals?pace=${pace}&id=${encodeURIComponent(dealParam)}` +
+                          (intakeId ? `&intake=${intakeId}` : ""), { method: "POST" });
   deal = await res.json();
   listPrice = deal.product.list_price;
   renderChips(deal.integrations, deal.room);
   renderRoomMode(deal.room);
-  renderRules(deal);
+  renderRules(deal, deal.intake);
   pushStep(money(listPrice), "list price", "struck");
   $("stage").innerHTML = `<div class="k">Agents negotiating in ${esc(deal.room?.title || deal.id)}…</div>`;
   source = new EventSource(`/api/deals/${deal.id}/events`);
@@ -415,8 +446,58 @@ async function start() {
     else if (e.type === "authority") onAuthority(e);
     else if (e.type === "room") { deal.room = e.room; renderRoomMode(e.room); }
     else if (e.type === "status") onStatus(e);
+    else if (e.type === "memory") agentSays(`Saved to memory: ${e.text}`, false);
   };
 }
+
+// ---- talk to the shopper agent (Moss memory; browser speech in/out) ----------
+let intake = null;
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const speakOn = new URLSearchParams(location.search).get("voice") !== "0";
+function bubble(cls, text) {
+  const c = $("convo"); c.querySelector(".hint")?.remove();
+  c.insertAdjacentHTML("beforeend", `<div class="b ${cls}">${esc(text)}</div>`); c.scrollTop = c.scrollHeight;
+}
+function agentSays(text, speak = true) {
+  bubble("agent", text);
+  if (speak && speakOn && window.speechSynthesis) {
+    speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1.05; speechSynthesis.speak(u);
+  }
+}
+function renderIntake(v) {
+  const f = v.fields, val = k => f[k]?.value;
+  const shopper = { max_price: val("max_price") ?? 0, preferred_variant: val("preferred_variant") || "—",
+    fallback_variants: val("fallback_variants") || [], fallback_return_days: val("fallback_return_days") ?? 45,
+    delivery_deadline: val("delivery_deadline"), minimum_return_days: val("minimum_return_days") ?? 30,
+    approval_required_above: val("approval_required_above") ?? 0, competitor_price: val("competitor_price"),
+    competitor_retailer: val("competitor_retailer") };
+  if (scenarioCache) renderRules({ shopper, merchant: scenarioCache.merchant }, f);
+  $("memLabel").hidden = !v.recalled.length;
+  const live = v.memory?.mode === "live";
+  $("mems").innerHTML = v.recalled.map(r => `<div>“${esc(r.text)}”<span class="ms">${live ? r.ms + " ms" : "local"}</span></div>`).join("");
+  if (v.product) $("productLine").textContent = `${v.product.name}${v.product.carried ? "" : " — not sold by reachable merchants"}`;
+  const b = $("startBtn");
+  if (b && v.product?.carried) b.textContent = "Find a merchant & negotiate";
+}
+async function say(text) {
+  text = text.trim(); if (!text) return;
+  bubble("you", text);
+  const r = await fetch("/api/intake", { method: "POST", headers: { "Content-Type": "application/json" },
+                                         body: JSON.stringify({ text, intake_id: intake?.intake_id }) });
+  if (!r.ok) { agentSays("Sorry — I couldn't process that.", false); return; }
+  intake = await r.json();
+  agentSays(intake.reply);
+  renderIntake(intake);
+  if (intake.confirmed) start(intake.intake_id);
+}
+$("talkForm").onsubmit = e => { e.preventDefault(); const i = $("talkInput"); say(i.value); i.value = ""; };
+if (SR) {
+  const rec = new SR(); rec.lang = "en-US"; rec.interimResults = true;
+  rec.onresult = e => { const t = [...e.results].map(x => x[0].transcript).join(""); $("talkInput").value = t;
+                        if (e.results[e.results.length - 1].isFinal) { $("talkInput").value = ""; say(t); } };
+  rec.onend = () => $("micBtn").classList.remove("on");
+  $("micBtn").onclick = () => { if ($("micBtn").classList.toggle("on")) { speechSynthesis?.cancel(); rec.start(); } else rec.stop(); };
+} else { $("micBtn").disabled = true; $("micBtn").title = "Voice needs Chrome — type instead"; }
 
 async function approve() {
   const b = $("approveBtn");
@@ -427,12 +508,15 @@ async function approve() {
 }
 
 document.addEventListener("keydown", e => {
+  if (e.target.closest?.("input, textarea")) return;  // typing to the agent
   if (e.key === "a" && $("approveBtn")) approve();
-  if (e.key === "Enter" && $("startBtn")) start();
+  if (e.key === "Enter" && $("startBtn")) start(intake?.product?.carried ? intake.intake_id : null);
 });
-$("startBtn").onclick = start;
+$("startBtn").onclick = () => start(intake?.product?.carried ? intake.intake_id : null);
+let scenarioCache = null;
 fetch(`/api/scenario`).then(r => r.ok ? r.json() : null).then(s => {
   if (!s) return;
+  scenarioCache = s;
   renderRules(s);
   listPrice = s.product.list_price;
   if ($("productLine")) $("productLine").textContent = `${s.product.name} · list ${money(s.product.list_price)}`;

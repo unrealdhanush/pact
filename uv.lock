@@ -404,12 +404,36 @@ wheels = [
 ]
 
 [[package]]
+name = "inferedge-moss-core"
+version = "0.26.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6e/7c/7160d3d7fd38ac60e20b7ff63d0a28a01e2ee9469b94828a410f691c655b/inferedge_moss_core-0.26.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:8bfcc664536a6fa5e0a9a7901643398ad3cd528525c3345628d4604f16c8548d", size = 4491880, upload-time = "2026-09-29T02:48:59.465Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/15/51b2882463abe49026562de5c22f9205749270a1f7a5e4f004fae5fd3b94/inferedge_moss_core-0.26.0-cp310-abi3-manylinux_2_35_x86_64.whl", hash = "sha256:45aebc79acca4960dba84ffe06770ef28615b02a99966ce323437081975f7040", size = 5492337, upload-time = "2026-09-29T02:49:01.902Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/29/4a4e3973248b123f7de57899204ab2219ac7a09dd7f9181ba5657adfe16b/inferedge_moss_core-0.26.0-cp310-abi3-manylinux_2_39_aarch64.whl", hash = "sha256:4bcc4efd314e58dcf14524780b421b54ed268ff6b316ad5f9e322e19653f3988", size = 5356361, upload-time = "2026-09-29T02:49:03.331Z" },
+    { url = "https://files.pythonhosted.org/packages/88/3b/2cf3248cf59e3adc2c531740afec0ffaee837d36b4b7a5681910e0c23499/inferedge_moss_core-0.26.0-cp310-abi3-win_amd64.whl", hash = "sha256:756bbd329f084b1ffb30e3f560e223fe22ba425ac5198cb1c46705fac1f7bb81", size = 5982191, upload-time = "2026-09-29T02:49:04.74Z" },
+]
+
+[[package]]
 name = "iniconfig"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/72/34/14ca021ce8e5dfedc35312d08ba8bf51fdd999c576889fc2c24cb97f4f10/iniconfig-2.3.0.tar.gz", hash = "sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730", size = 20503, upload-time = "2025-10-18T21:55:43.219Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484, upload-time = "2025-10-18T21:55:41.639Z" },
+]
+
+[[package]]
+name = "moss"
+version = "1.14.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "inferedge-moss-core" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e4/4a/b6c6fd5c9050089271cdc0c51a7d144a75fd010ee878cdddb8c575408d49/moss-1.14.0.tar.gz", hash = "sha256:273176b02b1d1dd9731e0b2ff9a2b36ae073c5d6a6473d2c43bb96947862940f", size = 34085, upload-time = "2026-09-29T02:52:46.332Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6f/cf/88fbfe9d0391bb62bb8118110e41febde442ab87917f0d8df5111c09e282/moss-1.14.0-py3-none-any.whl", hash = "sha256:75417623434e46ecca4c773a47c76d7eebf52eb68bc217ad176164716c286030", size = 30494, upload-time = "2026-09-29T02:52:44.781Z" },
 ]
 
 [[package]]
@@ -441,6 +465,7 @@ dependencies = [
     { name = "band-sdk" },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "moss" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "uvicorn", extra = ["standard"] },
@@ -457,6 +482,7 @@ requires-dist = [
     { name = "band-sdk", specifier = ">=4.0.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "moss", specifier = ">=1.14.0" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
