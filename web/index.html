@@ -224,10 +224,12 @@ body.review-timeline .room { height:260px; }
 .track .steps { margin:16px 0 10px; }
 @media(max-width:700px) { .delivery-map { aspect-ratio:620/320; }.route-heading { padding:14px; }.route-footer,.route-time { padding-left:14px; padding-right:14px; }.roomhead { padding-left:20px; padding-right:20px; }.route-heading h3 { font-size:13px; } }
 
+a.brand { color:inherit; text-decoration:none; cursor:pointer; }
+a.brand:focus-visible { outline:2px solid var(--shopper); outline-offset:4px; border-radius:6px; }
 </style>
 </head>
 <body class="idle">
-<header><div class="brand">pact</div><div class="tag">Agent commerce.</div><div class="header-end"><button class="header-link" id="homeBtn" hidden>Overview</button><button class="header-link" id="workspaceBtn">Open workspace ↗</button><details class="systems"><summary>Connections</summary><div class="chips" id="chips"><span class="chip deal" id="dealId">No active deal</span></div></details></div></header>
+<header><a class="brand" id="brandLink" href="#" aria-label="Pact home">pact</a><div class="tag">Agent commerce.</div><div class="header-end"><button class="header-link" id="homeBtn" hidden>Overview</button><button class="header-link" id="workspaceBtn">Open workspace ↗</button><details class="systems"><summary>Connections</summary><div class="chips" id="chips"><span class="chip deal" id="dealId">No active deal</span></div></details></div></header>
 <div class="landing" id="landingView">
   <div class="landing-hero"><div class="landing-copy"><div class="eyebrow">Meet Pact</div><h1>Good deals.<br><span>Better boundaries.</span></h1><p>A shopper agent. A merchant agent. An agreement that works for both—with you in control.</p><button class="start" id="enterBtn">Try Pact <span aria-hidden="true">↗</span></button><div class="label2">An interactive demo. No account needed.</div></div>
   <div class="landing-visual"><div class="visual-halo" aria-hidden="true"></div><img class="product-art" src="/assets/sony-wh1000xm5.png" alt="Original 3D-style render of black Sony WH-1000XM5 headphones" width="300" height="300"><div class="floating-offer"><span class="offer-icon" aria-hidden="true">✓</span><div><strong>The details, worked out.</strong><small>Within budget. Within policy.</small></div><div class="offer-price">Your call<small>Human approval</small></div></div></div></div>
@@ -313,6 +315,7 @@ function openWorkspace() { location.hash = 'workspace'; }
 $('enterBtn').onclick = openWorkspace;
 $('workspaceBtn').onclick = openWorkspace;
 $('homeBtn').onclick = () => { location.hash = ''; };
+$('brandLink').onclick = e => { e.preventDefault(); location.hash = ''; window.scrollTo({ top: 0, behavior: 'smooth' }); };
 window.addEventListener('hashchange', renderView);
 renderView();
 
