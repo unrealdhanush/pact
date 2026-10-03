@@ -17,6 +17,7 @@ from pydantic import BaseModel
 TAVILY_URL = "https://api.tavily.com/search"
 CACHE_FILE = Path(__file__).resolve().parent / "data" / "competitor_cache.json"
 TOLERANCE = 0.50  # dollars
+CACHE_MAX_AGE_H = 24  # a cached confirmation older than this doesn't stand in for an inconclusive search
 _PRICE = re.compile(r"\$\s?(\d{2,4}(?:,\d{3})*(?:\.\d{2})?)")
 
 
@@ -66,6 +67,13 @@ def _load_cache() -> dict:
     return json.loads(CACHE_FILE.read_text()) if CACHE_FILE.exists() else {}
 
 
+def _age_hours(iso: str) -> float:
+    try:
+        return (datetime.now(timezone.utc) - datetime.fromisoformat(iso)).total_seconds() / 3600
+    except ValueError:
+        return float("inf")
+
+
 def _from_cache(product: str, retailer: str, claimed: float, why: str) -> CompetitorCheck:
     hit = _load_cache().get(_cache_key(product, retailer))
     if hit:
@@ -79,23 +87,41 @@ def _from_cache(product: str, retailer: str, claimed: float, why: str) -> Compet
                            source="unavailable", source_title=why)
 
 
+def _queries(product: str, retailer: str) -> list[dict]:
+    """Search variants, most reliable first (measured: advanced depth on the retailer domain)."""
+    domain = _domain(retailer)
+    scope = {"include_domains": [domain]} if domain else {}
+    return [
+        {"query": f"{product} price", "search_depth": "advanced", **scope},
+        {"query": f"buy {product} price", "search_depth": "basic", **scope},
+        {"query": f"{product} price {retailer}", "search_depth": "basic"},
+    ]
+
+
 async def verify_competitor_price(product: str, retailer: str, claimed: float) -> CompetitorCheck:
     key = os.environ.get("TAVILY_API_KEY")
     if not key:
         return _from_cache(product, retailer, claimed, "Tavily not configured")
-    body = {"query": f"buy {product} price", "max_results": 5, "search_depth": "basic"}
-    if domain := _domain(retailer):
-        body["include_domains"] = [domain]
+    results: list[dict] = []
+    hit = None
     try:
         async with httpx.AsyncClient(timeout=12) as http:
-            res = await http.post(TAVILY_URL, headers={"Authorization": f"Bearer {key}"}, json=body)
-            res.raise_for_status()
-            results = res.json().get("results", [])
+            for body in _queries(product, retailer):  # stop at the first query that finds the price
+                res = await http.post(TAVILY_URL, headers={"Authorization": f"Bearer {key}"},
+                                      json={**body, "max_results": 5})
+                res.raise_for_status()
+                results = res.json().get("results", [])
+                if hit := _match(results, claimed, product):
+                    break
     except (httpx.HTTPError, ValueError) as e:
         return _from_cache(product, retailer, claimed, f"Tavily error: {type(e).__name__}")
 
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    hit = _match(results, claimed, product)
+    if hit is None:
+        # A search miss is weak evidence; reuse a recent confirmed result, labelled as cached.
+        cached = _from_cache(product, retailer, claimed, "live search inconclusive")
+        if cached.verified and _age_hours(cached.checked_at) <= CACHE_MAX_AGE_H:
+            return cached.model_copy(update={"source_title": f"{cached.source_title} (live search inconclusive)"})
     check = CompetitorCheck(
         retailer=retailer, claimed_price=claimed, verified=hit is not None,
         found_price=hit[0] if hit else None,

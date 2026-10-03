@@ -120,10 +120,14 @@ class Deal:
             await self.room.close()
 
     # ------------------------------------------------------------ authority gate
-    def _on_agreement(self, agreement: Agreement) -> None:
+    def _on_agreement(self, agreement: Agreement) -> asyncio.Task:
+        """Starts the authority gate. Returns the gate task, so the shopper may `await` it or not."""
         self.agreement = agreement
         self._set_phase("checking_authority", agreement=agreement.model_dump(mode="json"))
-        self._spawn(self._gate(agreement))
+        task = asyncio.create_task(self._gate(agreement))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return task
 
     async def _gate(self, agreement: Agreement) -> None:
         if self.pace:

@@ -94,46 +94,52 @@ class ZooWorkMerchantAgent(MerchantAgent):
         self._pending = None  # shopper payload being handled this turn
         self._result = None  # engine result for this turn
         self._sent = False
+        # One ZooWork turn at a time: tool calls are listed per session, so overlapping
+        # turns would both execute (and both post) the same calls.
+        self._turn_lock = asyncio.Lock()
+        self._handled: set[str] = set()  # tool call ids already executed, across turns
 
     async def handle(self, payload) -> None:
         if isinstance(payload, Agreement):  # no model turn needed to acknowledge
             return await super().handle(payload)
         if not isinstance(payload, (Proposal, ConditionalAccept)):
             return await super().handle(payload)
-        try:
-            await self._zoowork_turn(payload)
-        except (ZooWorkError, OSError, asyncio.TimeoutError) as e:
-            if self._sent:
-                return
-            self.think(f"ZooWork unavailable ({str(e)[:80]}) — answering with local merchant logic")
-            await super().handle(payload)
+        text = self.last_message.text if self.last_message else ""  # capture before waiting
+        async with self._turn_lock:
+            try:
+                await self._zoowork_turn(payload, text)
+            except (ZooWorkError, OSError, asyncio.TimeoutError) as e:
+                if self._sent:
+                    return
+                self.think(f"ZooWork unavailable ({str(e)[:80]}) — answering with local merchant logic")
+                await super().handle(payload)
 
-    async def _zoowork_turn(self, payload) -> None:
+    async def _zoowork_turn(self, payload, text: str) -> None:
         self._pending, self._result, self._sent, self._check = payload, None, False, None
         if not self.session_id:
             self.session_id = await self.client.create_session(self.agent_id, {"deal": self.room.id})
             self.think(f"ZooWork session {self.session_id[:12]}… opened")
-        text = self.last_message.text if self.last_message else ""
         await self.client.send_message(self.agent_id, self.session_id, (
             f"New message from @ShopperAgent in room {self.room.id}:\n\"{text}\"\n\n"
             f"Structured payload:\n{json.dumps(payload.model_dump(mode='json'))}"
         ))
         self.think("ZooWork merchant agent reasoning…")
 
-        handled: set[str] = set()
         deadline = time.monotonic() + TURN_TIMEOUT_S
         while not self._sent:
             if time.monotonic() > deadline:
                 raise asyncio.TimeoutError(f"no reply within {TURN_TIMEOUT_S}s")
             for call in await self.client.pending_tool_calls(self.agent_id, self.session_id):
-                if call["call_id"] in handled:
+                if call["call_id"] in self._handled:
                     continue
-                handled.add(call["call_id"])
+                self._handled.add(call["call_id"])
                 try:
                     result, is_error = await self._run_tool(call["name"], call.get("input") or {}), False
                 except Exception as e:  # report tool failures back to the model
                     result, is_error = {"error": str(e)}, True
                 await self.client.resolve_tool_call(self.agent_id, call["call_id"], result, is_error)
+            if self._sent:
+                break
             await asyncio.sleep(POLL_S)
 
     # ------------------------------------------------------------ tools

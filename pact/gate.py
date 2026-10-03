@@ -99,7 +99,8 @@ async def evaluate(agreement: Agreement, shopper: ShopperState, merchant: Mercha
         remote = _as_dict(await asyncio.wait_for(check(agreement, shopper, merchant, **kw), timeout))
     except Exception as e:  # noqa: BLE001 - any failure falls back to local rules
         log.warning("authority.check_authority failed: %s", e)
-        return {**local, "source_label": f"{LOCAL_LABEL} ({type(e).__name__})"}
+        detail = str(e)[:120] or type(e).__name__
+        return {**local, "source_label": f"{LOCAL_LABEL} ({detail})"}
     remote.setdefault("checks", local["checks"])
     if _STRICTNESS.get(remote.get("decision"), 2) < _STRICTNESS[local["decision"]]:
         remote["decision"], remote["reason"] = local["decision"], f"{local['reason']} (local rules are stricter)"

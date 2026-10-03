@@ -28,6 +28,8 @@ class FakeBand:
             return {"data": {"id": i, "name": name, "handle": handle}}
         if path == "/agent/chats":
             return {"data": {"id": "chat-42", "title": body["chat"]["title"]}}
+        if path == "/me/chats":
+            return {"data": {"id": "chat-42", "title": body["chat"]["title"], "type": "group"}}
         if path.endswith("/participants"):
             return {"data": {"id": body["participant"]["participant_id"], "role": "member"}}
         if path.endswith("/messages"):
@@ -39,9 +41,13 @@ class FakeBand:
                 frame = [None, None, "chat_room:chat-42", "message_created",
                          {"id": mid, "content": body["message"]["content"], "message_type": "text",
                           "metadata": {"mentions": body["message"]["mentions"]}}]
-                # deliver before the REST response returns, like a fast socket
-                self.room._handle_frame(frame)
+                # deliver before the REST response returns, like a fast socket, to the mentioned agent
+                target = body["message"]["mentions"][0]["id"]
+                receiver = next(i for i in self.room.identities.values() if i.id == target)
+                self.room._handle_frame(frame, receiver)
             return {"data": {"id": mid, "success": True}}
+        if path.endswith("/processing") or path.endswith("/processed"):
+            return {"data": {"success": True}}
         if path.endswith("/events"):
             return {"data": {"id": "ev", "success": True}}
         if path == "/me/agents/register":
@@ -103,6 +109,11 @@ async def test_live_band_room_carries_the_whole_negotiation():
         for secret in ("$220", "$205", "$168", "17 units", "13%", "max_price", "unit_cost"):
             assert secret not in m["content"]
 
+    acks = [c for c in fake.calls if c[1].endswith("/processed")]
+    assert len(acks) == 5 and deal.room.stats["acked"] == 5
+    first = next(c for c in fake.calls if c[1].endswith("/processing"))
+    assert first[2] == "mkey"  # the recipient (merchant) acks the shopper's opening message
+
     events = [c for c in fake.calls if c[1].endswith("/events")]
     assert events and "HUMAN_APPROVAL_REQUIRED" in events[0][3]["event"]["content"]
     deal.approve()
@@ -139,6 +150,9 @@ async def test_setup_failure_uses_labelled_local_room():
 
 async def test_bootstrap_registers_two_agents_with_human_key(monkeypatch, tmp_path):
     monkeypatch.setenv("BAND_HUMAN_API_KEY", "human-key")
+    # bootstrap writes os.environ directly; pre-register the vars so monkeypatch restores them
+    monkeypatch.setenv("BAND_SHOPPER_AGENT_KEY", "")
+    monkeypatch.setenv("BAND_MERCHANT_AGENT_KEY", "")
     fake = FakeBand()
     cfg = await band.bootstrap_agents(request=fake, cache=tmp_path / ".env.band")
     assert (cfg.shopper_key, cfg.merchant_key) == ("key-ShopperAgent", "key-MerchantAgent")
@@ -162,3 +176,61 @@ def test_ws_frame_for_other_room_is_ignored():
     room._handle_frame([None, None, "chat_room:other", "message_created", {"id": "x", "content": "hi"}])
     assert room._early == {}
     json.dumps(room.status())
+
+
+def test_decode_band_mention_tokens():
+    room = BandRoom("deal-1842", CFG)
+    room.identities["MerchantAgent"].id = "mid-2"
+    text, _ = decode_content("@[[mid-2]] Accepted: $219", room.identities)
+    assert text == "@MerchantAgent Accepted: $219"
+
+
+async def test_shared_agent_socket_joins_and_routes_by_topic():
+    from pact.band import AgentSocket, Identity
+
+    class FakeWS:
+        def __init__(self):
+            self.sent, self.inbox = [], asyncio.Queue()
+
+        async def send(self, raw):
+            frame = json.loads(raw)
+            self.sent.append(frame)
+            if frame[3] == "phx_join":
+                await self.inbox.put(json.dumps([frame[0], frame[1], frame[2], "phx_reply", {"status": "ok", "response": {}}]))
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            return await self.inbox.get()
+
+    ident = Identity("MerchantAgent", "mkey", id="mid-2")
+    sock = AgentSocket("wss://x", "mkey", "MerchantAgent")
+    sock.ws = FakeWS()
+    sock._tasks.add(asyncio.create_task(sock._reader(sock.ws)))
+    room = BandRoom("deal-1842", CFG)
+    room.chat_id = "chat-42"
+    got = []
+    room._handle_frame = lambda frame, receiver: got.append((frame[2], receiver.name))
+    await sock.join("chat_room:chat-42", room, ident)
+    await sock.ws.inbox.put(json.dumps([None, None, "chat_room:chat-42", "message_created", {"id": "m1"}]))
+    await sock.ws.inbox.put(json.dumps([None, None, "chat_room:other", "message_created", {"id": "m2"}]))
+    await asyncio.sleep(0.01)
+    assert got == [("chat_room:chat-42", "MerchantAgent")]
+    await sock.leave("chat_room:chat-42")
+    assert sock.ws.sent[-1][3] == "phx_leave"
+    for t in list(sock._tasks):
+        t.cancel()
+
+
+async def test_human_key_creates_human_owned_room_with_both_agents():
+    fake = FakeBand()
+    cfg = BandConfig(shopper_key="skey", merchant_key="mkey", ws_timeout=0.05, human_key="hkey")
+    room = await BandRoom.create("deal-1842", cfg, request=fake, connect_ws=False)
+    create = next(c for c in fake.calls if c[1] == "/me/chats")
+    assert create[2] == "hkey" and create[3] == {"chat": {"title": "#DEAL-1842"}}
+    adds = [c for c in fake.calls if c[1] == "/me/chats/chat-42/participants"]
+    assert [c[3]["participant"]["participant_id"] for c in adds] == ["sid-1", "mid-2"]
+    assert all(c[2] == "hkey" for c in adds)
+    assert not any(c[1] == "/agent/chats" for c in fake.calls)
+    assert room.status()["owner"] == "human"

@@ -162,7 +162,7 @@
     <div class="room" id="room"></div>
     <div class="typing" id="typing"></div>
     <div class="stage" id="stage">
-      <div class="k" style="margin-bottom:10px">Aria ANC Headphones · list $249</div>
+      <div class="k" style="margin-bottom:10px" id="productLine">&nbsp;</div>
       <button class="start" id="startBtn">Start negotiation</button>
     </div>
   </section>
@@ -182,7 +182,7 @@ const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
 const pace = qs.get("pace") || "0.8";
 const dealParam = qs.get("id") || "deal-1842";
-let deal = null, source = null, listPrice = 249, why = [], agreement = null, authority = null, integrations = [];
+let deal = null, source = null, listPrice = 0, why = [], agreement = null, authority = null, integrations = [];
 
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const money = n => "$" + (Number.isInteger(+n) ? n : (+n).toFixed(2));
@@ -210,7 +210,9 @@ function renderRoomMode(room) {
   if (!room) return;
   $("roomName").textContent = room.title || "# deal room";
   $("roomMode").innerHTML = room.live
-    ? `<span class="live">● BAND live</span> · ${room.posted ?? 0} msgs · ${room.ws_delivered ?? 0} via WebSocket${room.local_delivered ? ` · ${room.local_delivered} local fallback` : ""}`
+    ? (room.ws_connected >= 2
+        ? `<span class="live">● BAND live</span>${room.owner === "human" ? " · human-owned room" : ""} · ${room.posted ?? 0} msgs · ${room.ws_delivered ?? 0} via WebSocket${room.local_delivered ? ` · ${room.local_delivered} local fallback` : ""}`
+        : `<span class="live">● BAND live (REST)</span> · <span class="sim">WebSocket unavailable — ${room.local_delivered ?? 0} delivered locally</span>`)
     : `<span class="sim">● ${esc(room.transport)}</span> · not on BAND`;
   renderChips(null, room);
 }
@@ -429,7 +431,12 @@ document.addEventListener("keydown", e => {
   if (e.key === "Enter" && $("startBtn")) start();
 });
 $("startBtn").onclick = start;
-fetch(`/api/scenario`).then(r => r.ok ? r.json() : null).then(s => s && renderRules(s));
+fetch(`/api/scenario`).then(r => r.ok ? r.json() : null).then(s => {
+  if (!s) return;
+  renderRules(s);
+  listPrice = s.product.list_price;
+  if ($("productLine")) $("productLine").textContent = `${s.product.name} · list ${money(s.product.list_price)}`;
+});
 fetch(`/api/integrations`).then(r => r.ok ? r.json() : null).then(l => l && renderChips(l));
 </script>
 </body>
