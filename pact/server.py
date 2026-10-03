@@ -100,7 +100,7 @@ async def deal_events(deal_id: str):
 
 
 @app.post("/api/deals/{deal_id}/approve")
-def approve(deal_id: str):
+async def approve(deal_id: str):  # async: Deal.approve schedules BAND events on the running loop
     try:
         return _get(deal_id).approve()
     except ValueError as e:
