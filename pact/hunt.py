@@ -22,7 +22,7 @@ from .scenario import ShopperState
 log = logging.getLogger("pact.hunt")
 
 PREFERENCES = ("best", "cheapest", "fastest")
-CHILD_ALWAYS = {"message", "trace", "room", "memory", "near_miss", "tracking"}  # forwarded from every room
+CHILD_ALWAYS = {"message", "trace", "room", "memory", "near_miss", "tracking", "return"}  # forwarded from every room
 CHILD_WINNER = {"phase", "authority", "status"}  # forwarded only from the winning room
 NEGOTIATION_TIMEOUT_S = 90
 
@@ -93,6 +93,16 @@ class Hunt:
 
     def why(self) -> list[str]:
         return self.winner.why() if self.winner else []
+
+    async def start_return(self, reason: str) -> None:
+        if not self.winner:
+            raise ValueError("No order to return")
+        await self.winner.start_return(reason)
+
+    def approve_return(self, by: str = "human") -> dict:
+        if not self.winner:
+            raise ValueError("No order to return")
+        return self.winner.approve_return(by)
 
     def approve(self) -> dict:
         if not self.winner:

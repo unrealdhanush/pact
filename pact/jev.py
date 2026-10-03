@@ -207,3 +207,50 @@ async def near_miss_decision(nm: dict, shopper: ShopperState, merchant: str, tra
     reason = (f"{pct}% over budget — Jev: {ans['choice']} (confidence {conf:.2f})"
               + ("" if conf >= MIN_CONFIDENCE else "; low confidence, so asking"))
     return {"decision": decision, "source": "jev", "reason": reason, "confidence": round(conf, 2)}
+
+
+# ---------------------------------------------------------------- returns: authority for a resolution
+async def evaluate_resolution(r, shopper: ShopperState, merchant: MerchantState, reason: str,
+                              transcript: list[str]) -> dict:
+    """Rules first (merchant goodwill authority; non-cash needs the human), then Jev can only tighten."""
+    checks = [
+        {"side": "merchant", "rule": "Goodwill within agent authority", "ok": r.goodwill_credit <= merchant.max_goodwill,
+         "detail": f"${r.goodwill_credit:.0f} of ${merchant.max_goodwill:.0f}"},
+        {"side": "merchant", "rule": "Inside the return window", "ok": True, "detail": "delivered, window open"},
+        {"side": "shopper", "rule": "Cash refund (no approval needed)", "ok": r.resolution == "refund",
+         "detail": "refund" if r.resolution == "refund" else f"{r.resolution.replace('_', ' ')} instead of cash"},
+    ]
+    m_ok = all(c["ok"] for c in checks if c["side"] == "merchant")
+    if not m_ok:
+        decision, why = "REJECT", "Goodwill exceeds the merchant agent's authority"
+    elif r.resolution != "refund":
+        decision, why = "HUMAN_APPROVAL_REQUIRED", "Non-cash resolution — the shopper's human decides"
+    else:
+        decision, why = "AUTO_APPROVE", "Full refund inside every boundary"
+    out = {"decision": decision, "reason": why, "merchant_policy_ok": m_ok,
+           "shopper_policy_ok": r.resolution == "refund", "checks": checks, "source": "local"}
+    key = os.environ.get("TYPESAFE_API_KEY") or os.environ.get("JEV_API_KEY")
+    if not key:
+        return {**out, "source_label": "Jev not configured — local policy rules"}
+    try:
+        async with httpx.AsyncClient(timeout=15) as http:
+            base = os.environ.get("JEV_BASE_URL", JEV_BASE_URL).rstrip("/")
+            res = await http.post(f"{base}/v1/systemone", headers={"Authorization": f"Bearer {key}"}, json={
+                "model": os.environ.get("JEV_MODEL", "jev-latest"),
+                "state": {"return_reason": reason, "resolution": r.model_dump(mode="json"), "checks": checks,
+                          "transcript": transcript[-6:]},
+                "questions": {"decision": {"type": "choice",
+                    "instructions": "A shopper's agent and a merchant's agent agreed how to resolve a return. "
+                                    "May it be issued automatically?",
+                    "criteria": {"AUTO_APPROVE": "Cash refund inside every check; nothing for a human to decide.",
+                                 "HUMAN_APPROVAL_REQUIRED": "The customer gets something other than cash, or a check "
+                                                            "is borderline; the human should confirm.",
+                                 "REJECT": "A merchant authority check failed or the agreement looks wrong."}}}})
+            res.raise_for_status()
+            ans = res.json()["answers"]["decision"]
+    except (httpx.HTTPError, KeyError, ValueError) as e:
+        return {**out, "source_label": f"Jev unavailable ({type(e).__name__}) — local policy rules"}
+    final = ans["choice"] if _SEVERITY[ans["choice"]] > _SEVERITY[decision] else decision
+    return {**out, "decision": final, "source": "jev", "confidence": round(ans.get("confidence", 0), 2),
+            "source_label": f"Jev live decision (confidence {ans.get('confidence', 0):.2f})",
+            "reason": why if final == decision else f"Jev escalated to {final}"}

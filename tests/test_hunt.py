@@ -91,3 +91,26 @@ async def test_order_tracking_after_execution():
     assert stages == ["confirmed", "packed", "shipped", "out_for_delivery", "delivered"]
     last = [e for e in h.events if e["type"] == "tracking"][-1]
     assert last["simulated"] and last["date"] == h.agreement.terms.delivery_date.isoformat()
+
+
+async def test_return_flow_negotiates_store_credit_and_needs_the_human():
+    h = Hunt(pace=0, preference="fastest")
+    await h.setup()
+    await h.run()
+    await settle(h)
+    h.approve()
+    await h.start_return("They're uncomfortable after an hour")
+    for _ in range(300):
+        rs = getattr(h.winner, "return_state", {}) or {}
+        if rs.get("status") in ("awaiting_approval", "resolved", "rejected"):
+            break
+        await asyncio.sleep(0.01)
+    rs = h.winner.return_state
+    kinds = [m.payload["kind"] for m in h.winner.room.history if m.payload and m.payload["kind"].startswith(("return", "resolution"))]
+    assert kinds == ["return_request", "resolution_offer", "resolution_counter", "resolution_offer", "resolution_accept"]
+    assert rs["status"] == "awaiting_approval" and rs["terms"]["resolution"] == "store_credit"
+    assert rs["terms"]["goodwill_credit"] == 30 and rs["authority"]["decision"] == "HUMAN_APPROVAL_REQUIRED"
+    out = h.approve_return()
+    assert out["simulated"] and h.winner.return_state["status"] == "resolved"
+    with pytest.raises(ValueError):
+        await h.start_return("again")

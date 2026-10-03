@@ -293,3 +293,70 @@ def explain_choice(s: ShopperState, win: Offer, wb: dict, other: Offer, ob: dict
     if win.price < other.price:
         bits.append(f"{money(other.price - win.price)} cheaper")
     return "; ".join(bits) or "best overall fit"
+
+
+# ---------------------------------------------------------------- returns / post-purchase resolution
+from .protocol import ResolutionAccept, ResolutionCounter, ResolutionOffer, ReturnRequest  # noqa: E402
+
+COMFORT = ("uncomfortable", "comfort", "hurt", "tight", "pressure", "fit")
+
+
+def resolution_cost(m: MerchantState, r: ResolutionOffer) -> float:
+    """What a resolution costs the merchant."""
+    if r.resolution == "refund":
+        return m.return_shipping_cost + r.amount * (1 - m.open_box_recovery) + r.goodwill_credit
+    if r.resolution == "exchange":
+        return m.return_shipping_cost * 2 + r.amount * (1 - m.open_box_recovery) * 0.5 + r.goodwill_credit
+    return r.goodwill_credit  # store credit keeps the revenue; only the bonus costs us
+
+
+def merchant_first_resolution(m: MerchantState, req: ReturnRequest, price: float, product: str
+                              ) -> tuple[ResolutionOffer, list[str]]:
+    """Lead with what's cheapest for the store that still addresses the customer."""
+    goodwill = min(15.0, m.max_goodwill)
+    offer = ResolutionOffer(transaction_id=req.transaction_id, resolution="exchange", amount=price,
+                            goodwill_credit=goodwill, exchange_for=product)
+    refund = ResolutionOffer(transaction_id=req.transaction_id, resolution="refund", amount=price)
+    notes = [f"Refund would cost us {money(resolution_cost(m, refund))} (return shipping + open-box resale loss)",
+             f"Exchange + {money(goodwill)} goodwill keeps the sale — leading with that"]
+    return offer, notes
+
+
+def shopper_evaluate_resolution(s: ShopperState, offer: ResolutionOffer, reason: str
+                                ) -> tuple[ResolutionAccept | ResolutionCounter, list[str]]:
+    notes = []
+    if offer.resolution == "refund":
+        return ResolutionAccept(transaction_id=offer.transaction_id, terms=offer), ["A full refund resolves it"]
+    if offer.resolution == "store_credit" and offer.goodwill_credit >= s.store_credit_min_bonus:
+        notes.append(f"Store credit with a {money(offer.goodwill_credit)} bonus clears my "
+                     f"{money(s.store_credit_min_bonus)} minimum")
+        return ResolutionAccept(transaction_id=offer.transaction_id, terms=offer), notes
+    if offer.resolution == "exchange" and any(w in reason.lower() for w in COMFORT):
+        notes.append("Same model again won't fix a comfort problem — an exchange doesn't resolve it")
+    else:
+        notes.append(f"{offer.resolution.replace('_', ' ')} with {money(offer.goodwill_credit)} isn't enough")
+    return ResolutionCounter(transaction_id=offer.transaction_id, acceptable=[
+        {"resolution": "refund"}, {"resolution": "store_credit", "min_bonus": s.store_credit_min_bonus}]), notes
+
+
+def merchant_resolve_counter(m: MerchantState, c: ResolutionCounter, price: float
+                             ) -> tuple[ResolutionOffer | None, list[str]]:
+    """Pick the acceptable option that costs the store least, within goodwill authority."""
+    options = []
+    for a in c.acceptable:
+        if a["resolution"] == "refund":
+            options.append(ResolutionOffer(transaction_id=c.transaction_id, resolution="refund", amount=price))
+        elif a["resolution"] == "store_credit":
+            bonus = float(a.get("min_bonus", 0))
+            if bonus <= m.max_goodwill:
+                options.append(ResolutionOffer(transaction_id=c.transaction_id, resolution="store_credit",
+                                               amount=price, goodwill_credit=bonus))
+    if not options:
+        return None, ["Nothing they'd accept is within my authority"]
+    options.sort(key=lambda r: resolution_cost(m, r))
+    best = options[0]
+    notes = [f"{o.resolution.replace('_', ' ')}: costs us {money(resolution_cost(m, o))}" for o in options]
+    notes.append(f"Cheapest acceptable: {best.resolution.replace('_', ' ')}"
+                 + (f" + {money(best.goodwill_credit)} bonus (within my {money(m.max_goodwill)} goodwill limit)"
+                    if best.goodwill_credit else ""))
+    return best, notes

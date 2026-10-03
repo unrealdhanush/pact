@@ -304,6 +304,59 @@ class Deal:
         self._spawn(self._track(checkout["order_id"]))
         return checkout
 
+    # ------------------------------------------------------------ returns (post-purchase resolution)
+    async def start_return(self, reason: str) -> None:
+        if self.status != "complete" or not self.execution:
+            raise ValueError("Only a completed order can be returned")
+        if getattr(self, "return_state", None):
+            raise ValueError("A return is already open for this order")
+        self.return_state = {"status": "negotiating", "reason": reason}
+        self.merchant.order = {"price": self.agreement.terms.price, "product": self.product.name,
+                               "order_id": self.execution["order_id"]}
+        self.shopper.on_resolution = self._on_resolution
+        self.emit("return", phase="negotiating", reason=reason, order_id=self.execution["order_id"])
+        self._trace("merchant", "think", "Returns are handled by the store's local policy engine")
+        self._spawn(self.shopper.request_return(self.execution["order_id"], reason))
+
+    def _on_resolution(self, terms) -> None:
+        self.return_state.update(status="checking_authority", terms=terms.model_dump(mode="json"))
+        self.emit("return", phase="checking_authority", terms=terms.model_dump(mode="json"))
+        self._spawn(self._resolution_gate(terms))
+
+    async def _resolution_gate(self, terms) -> None:
+        transcript = [f"{m.sender}: {m.text}" for m in self.room.history]
+        d = await jev.evaluate_resolution(terms, self.shopper_state, self.merchant_state,
+                                          self.return_state["reason"], transcript)
+        self.return_state["authority"] = d
+        self._trace("shopper", "think", f"Jev (return) → {d['decision']}: {d['reason']}")
+        if d["decision"] == "AUTO_APPROVE":
+            self.approve_return(by="policy")
+        elif d["decision"] == "REJECT":
+            self.return_state["status"] = "rejected"
+            self.emit("return", phase="rejected", authority=d)
+        else:
+            self.return_state["status"] = "awaiting_approval"
+            self.emit("return", phase="awaiting_approval", authority=d, terms=terms.model_dump(mode="json"))
+
+    def approve_return(self, by: str = "human") -> dict:
+        rs = getattr(self, "return_state", None)
+        if not rs or rs["status"] not in ("awaiting_approval", "checking_authority"):
+            raise ValueError("No resolution is waiting for approval")
+        t = rs["terms"]
+        label = f"RMA-{abs(hash(self.execution['order_id'])) % 10**6:06d}"
+        rs.update(status="resolved", approved_by=by, label=label)
+        what = (f"Refund of {money(t['amount'])}" if t["resolution"] == "refund" else
+                f"{money(t['amount'] + t['goodwill_credit'])} store credit")
+        self.emit("return", phase="resolved", terms=t, label=label, approved_by=by, simulated=True,
+                  summary=f"{what} · prepaid return label {label} · drop off within 14 days")
+        if self.room is not None:
+            self._spawn(self.room.post_event(f"Return approved by {'the shopper' if by == 'human' else 'policy'}: "
+                                             f"{what}. Return label {label} (simulated).", "task",
+                                             {"order_id": self.execution["order_id"], "rma": label, "simulated": True}))
+        if getattr(self, "on_return", None):
+            self._spawn(self.on_return(self))
+        return {"label": label, "resolution": t, "simulated": True}
+
     async def _track(self, order_id: str) -> None:
         """Post-purchase tracking (simulated carrier, sped-up demo clock). The merchant agent posts each
         update into the same BAND room, so the deal and its fulfilment share one auditable thread."""

@@ -79,8 +79,43 @@ class Agreement(BaseModel):
     human_approval_required: bool
 
 
+# ---------------------------------------------------------------- post-purchase resolution (returns)
+Resolution = Literal["refund", "exchange", "store_credit"]
+
+
+class ReturnRequest(BaseModel):
+    kind: Literal["return_request"] = "return_request"
+    transaction_id: str
+    order_id: str
+    reason: str
+    wants: Resolution = "refund"
+
+
+class ResolutionOffer(BaseModel):
+    kind: Literal["resolution_offer"] = "resolution_offer"
+    transaction_id: str
+    resolution: Resolution
+    amount: float  # refund / credit value (the purchase price)
+    goodwill_credit: float = 0
+    exchange_for: str | None = None
+
+
+class ResolutionCounter(BaseModel):
+    """Shopper: what would resolve it (any one of these)."""
+    kind: Literal["resolution_counter"] = "resolution_counter"
+    transaction_id: str
+    acceptable: list[dict]  # e.g. [{"resolution": "refund"}, {"resolution": "store_credit", "min_bonus": 30}]
+
+
+class ResolutionAccept(BaseModel):
+    kind: Literal["resolution_accept"] = "resolution_accept"
+    transaction_id: str
+    terms: ResolutionOffer
+
+
 Payload = Annotated[
-    Union[Proposal, Counteroffer, ConditionalAccept, MerchantAccept, Rejection, Agreement],
+    Union[Proposal, Counteroffer, ConditionalAccept, MerchantAccept, Rejection, Agreement,
+          ReturnRequest, ResolutionOffer, ResolutionCounter, ResolutionAccept],
     Field(discriminator="kind"),
 ]
 payload_adapter: TypeAdapter[Payload] = TypeAdapter(Payload)

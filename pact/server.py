@@ -194,6 +194,38 @@ async def answer_exception(deal_id: str, body: dict):
     return {"ok": True}
 
 
+@app.post("/api/deals/{deal_id}/return")
+async def start_return(deal_id: str, body: dict):
+    """Post-purchase: the human asks their agent to return the order. {"reason": "..."}"""
+    deal = _get(deal_id)
+    reason = str(body.get("reason") or "They're uncomfortable after an hour").strip()
+    target = getattr(deal, "winner", None) or deal
+    target.on_return = _remember_return
+    try:
+        await deal.start_return(reason)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return {"ok": True}
+
+
+@app.post("/api/deals/{deal_id}/return/approve")
+async def approve_return(deal_id: str):
+    try:
+        return _get(deal_id).approve_return()
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+async def _remember_return(deal) -> None:
+    rs, t = deal.return_state, deal.return_state["terms"]
+    note = (f"Returned the {deal.product.name} ({rs['reason']}). Took "
+            + (f"a full refund." if t["resolution"] == "refund" else
+               f"{money(t['amount'] + t['goodwill_credit'])} store credit instead of a refund.")
+            + f" Comfort matters — prefer models with a long return window.")
+    where = await memory.remember(f"return-{deal.id}", note, {"returned": deal.product.name})
+    deal.emit("memory", stored=where, text=note)
+
+
 @app.post("/api/deals/{deal_id}/approve")
 async def approve(deal_id: str):  # async: Deal.approve schedules BAND events on the running loop
     try:

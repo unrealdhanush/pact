@@ -1,6 +1,7 @@
 from .. import engine
 from ..engine import money
-from ..protocol import Agreement, ConditionalAccept, Counteroffer, MerchantAccept, Rejection
+from ..protocol import (Agreement, ConditionalAccept, Counteroffer, MerchantAccept, Rejection, ResolutionAccept,
+                        ResolutionCounter, ResolutionOffer, ReturnRequest)
 from ..scenario import Product, ShopperState
 from .base import Agent
 
@@ -49,6 +50,39 @@ class ShopperAgent(Agent):
             await self._on_accept(payload)
         elif isinstance(payload, Rejection):
             self.think(f"Merchant walked away: {payload.reason}")
+        elif isinstance(payload, ResolutionOffer):
+            await self._on_resolution(payload)
+
+    # ------------------------------------------------------------ returns
+    return_reason: str = ""
+    on_resolution = None  # Deal callback(ResolutionOffer) -> authority gate
+
+    async def request_return(self, order_id: str, reason: str) -> None:
+        self.return_reason = reason
+        self.think(f"Owner wants to return it: “{reason}”. Asking for a refund; store credit only with a real bonus")
+        await self.pause(0.6)
+        await self.room.post(self.name, f"@{MERCHANT} My customer would like to return order {order_id}: {reason}. "
+                                        f"They're asking for a refund.",
+                             ReturnRequest(transaction_id=self.room.id, order_id=order_id, reason=reason), [MERCHANT])
+
+    async def _on_resolution(self, offer: ResolutionOffer) -> None:
+        await self.pause(0.6)
+        result, notes = engine.shopper_evaluate_resolution(self.state, offer, self.return_reason)
+        for n in notes:
+            self.think(n)
+            await self.pause(0.4)
+        if isinstance(result, ResolutionCounter):
+            await self.room.post(self.name, f"@{MERCHANT} The same model won't fix a comfort problem. My customer "
+                                            f"needs a refund, or store credit with at least a "
+                                            f"{money(self.state.store_credit_min_bonus)} bonus.", result, [MERCHANT])
+            return
+        t = result.terms
+        self.reasons.append(f"You get {money(t.amount + t.goodwill_credit)} in store credit instead of a "
+                            f"{money(t.amount)} refund" if t.resolution == "store_credit" else "You get a full refund")
+        await self.room.post(self.name, f"@{MERCHANT} That works. Sending it for authority check before anything "
+                                        f"is issued.", result, [MERCHANT])
+        if self.on_resolution:
+            self.on_resolution(t)
 
     async def _on_counter(self, c: Counteroffer) -> None:
         self.think("Checking counteroffer against owner's boundaries")

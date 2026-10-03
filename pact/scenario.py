@@ -34,6 +34,8 @@ class ShopperState:
     competitor_retailer: str | None = "sony.com"
     competitor_price: float | None = 299.99
     competitor_product_id: str | None = "sony-wh1000xm5"  # the claim only applies to this product
+    # Returns: store credit instead of cash is acceptable only with at least this bonus.
+    store_credit_min_bonus: float = 30
     # What this human weighs most when comparing offers: any of price / colour / speed / returns.
     priorities: list[str] = field(default_factory=list)
 
@@ -54,6 +56,10 @@ class MerchantState:
     standard_return_days: int = 30
     max_return_days: int = 45
     return_cost_per_extra_day: float = 0.10
+    # post-purchase: what a refund costs us, and how much goodwill the agent may give on its own
+    return_shipping_cost: float = 9
+    open_box_recovery: float = 0.85  # a returned unit resells at this fraction of the price
+    max_goodwill: float = 30
 
 
 def next_weekday(d: date, weekday: int) -> date:

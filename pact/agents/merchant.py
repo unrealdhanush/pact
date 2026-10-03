@@ -3,7 +3,8 @@ from datetime import date
 from .. import engine
 from ..engine import money
 from ..tavily import verify_competitor_price
-from ..protocol import Agreement, ConditionalAccept, Proposal, Rejection
+from ..protocol import (Agreement, ConditionalAccept, Proposal, Rejection, ResolutionAccept, ResolutionCounter,
+                        ReturnRequest)
 from ..scenario import MerchantState, Product
 from .base import Agent
 from .merchant_tools import MerchantTools
@@ -32,6 +33,45 @@ class MerchantAgent(Agent):
             await self._on_conditional(payload)
         elif isinstance(payload, Agreement):
             self.think("Shopper confirmed; unit held pending authority check")
+        elif isinstance(payload, ReturnRequest):
+            await self._on_return(payload)
+        elif isinstance(payload, ResolutionCounter):
+            await self._on_resolution_counter(payload)
+        elif isinstance(payload, ResolutionAccept):
+            self.think("Customer accepted the resolution; waiting on the authority check before issuing it")
+
+    # ------------------------------------------------------------ returns (local policy engine)
+    order: dict = {}  # set by the Deal after checkout: {"price", "product", "order_id"}
+
+    async def _on_return(self, r: ReturnRequest) -> None:
+        self.tool(f"get_order({r.order_id}) → {money(self.order['price'])}, inside the return window")
+        await self.pause(0.6)
+        offer, notes = engine.merchant_first_resolution(self.state, r, self.order["price"], self.order["product"])
+        for n in notes:
+            self.think(n)
+            await self.pause(0.4)
+        await self.room.post(self.name, f"@{SHOPPER} Sorry to hear that. I can do a free exchange for another "
+                             f"{self.order['product']} plus a {money(offer.goodwill_credit)} goodwill credit.",
+                             offer, [SHOPPER])
+
+    async def _on_resolution_counter(self, c: ResolutionCounter) -> None:
+        await self.pause(0.6)
+        best, notes = engine.merchant_resolve_counter(self.state, c, self.order["price"])
+        for n in notes:
+            self.think(n)
+            await self.pause(0.4)
+        if best is None:
+            await self.room.post(self.name, f"@{SHOPPER} I can't go further on my own; escalating to the store.",
+                                 Rejection(transaction_id=c.transaction_id, party="merchant",
+                                           reason="outside merchant goodwill authority"), [SHOPPER])
+            return
+        text = (f"@{SHOPPER} Understood. I can refund the full {money(best.amount)} once it's back."
+                if best.resolution == "refund" else
+                f"@{SHOPPER} Understood. I can issue {money(best.amount)} in store credit plus a "
+                f"{money(best.goodwill_credit)} bonus — {money(best.amount + best.goodwill_credit)} to spend.")
+        self.reasons.append(f"The merchant offered {best.resolution.replace('_', ' ')} because it cost the store "
+                            f"less than the alternatives")
+        await self.room.post(self.name, text, best, [SHOPPER])
 
     async def verify_claim(self, p: Proposal):
         """Verify the shopper's competitor price with Tavily (only if one was cited)."""

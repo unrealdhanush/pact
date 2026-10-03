@@ -28,3 +28,13 @@ The shopper's **Budget** and **Ask me above** fields are editable before negotia
 Use **Sony XM5**, **Momentum 4**, or **Bose Ultra** to switch preset products. Their original AI-generated 3D-style renders are illustrative product visuals, not interactive 3D models or official manufacturer photos. The existing catalog and merchant economics still determine offers.
 
 After checkout, the delivery map follows the backend's simulated tracking events. **Replay route** previews warehouse → sorting center → destination without changing the order status. This map uses a fictional demo district and needs no map API or location access.
+
+## Second act: the return (≈30 s)
+
+After tracking reaches **Delivered**, click **Start a return** and send the prefilled reason
+(“They're uncomfortable after an hour — I'd like a refund”). In the same BAND deal room:
+the merchant offers an exchange + $15 goodwill (cheapest for the store); the shopper says the same
+model won't fix comfort and asks for a refund or store credit with ≥ $30 bonus; the merchant picks
+store credit + $30 (cheaper than a refund, inside its $30 goodwill authority). Jev: non-cash
+resolution → **your call**. Click **Accept** → simulated return label, posted to the BAND room, and
+remembered by Moss. Line: “Same protocol, same room — before and after the purchase.”

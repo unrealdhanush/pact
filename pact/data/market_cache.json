@@ -3,6 +3,13 @@
     "product": "Sony WH-1000XM5",
     "listings": [
       {
+        "retailer": "B&H Photo",
+        "domain": "bhphotovideo.com",
+        "price": 298.0,
+        "title": "Sony WH-1000XM5 Noise-Canceling Wireless Over-Ear Headphones (Black)",
+        "url": "https://www.bhphotovideo.com/c/product/1706293-REG/sony_6505727_sony_wh_1000xm5_wireless_noise_canceling.html"
+      },
+      {
         "retailer": "Best Buy",
         "domain": "bestbuy.com",
         "price": 298.0,
@@ -25,8 +32,8 @@
       }
     ],
     "source": "tavily",
-    "checked_at": "2026-10-03T21:44:19+00:00",
-    "ms": 6067
+    "checked_at": "2026-10-03T22:12:28+00:00",
+    "ms": 381
   },
   "sennheiser-m4": {
     "product": "Sennheiser Momentum 4",

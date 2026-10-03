@@ -131,6 +131,12 @@ body.decision .stage { border:0; flex:1; padding:28px; }
 .track { text-align:left; margin-top:20px; }.track .steps { display:grid; grid-template-columns:repeat(5,1fr); list-style:none; padding:0; gap:5px; font-size:10px; }.track li { border-top:2px solid var(--line); padding-top:8px; }.track li.done,.track li.now { border-color:var(--shopper); }.track b { display:block; font-size:10px; }.track small,.tl { color:var(--muted); font-size:10px; }
 .opts { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin:18px 0; text-align:left; }.opt { border:1px solid var(--line); border-radius:16px; padding:16px; cursor:pointer; transition:border-color .2s,background .2s; }.opt.sel { border-color:var(--shopper); background:var(--shopper-dim); }.opt.off { opacity:.5; cursor:default; }.opt .nm { font-size:13px; font-weight:600; }.opt .sp,.opt .ref,.opt .vr { font-size:10px; color:var(--muted); margin-top:6px; }.opt .pr { font-size:24px; font-weight:600; margin-top:10px; }
 .chips2 { display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin:10px 0; }.chip2 { border-radius:999px; background:var(--panel2); color:var(--muted); padding:6px 10px; font-size:10px; }.chip2.on { background:var(--shopper-dim); color:var(--shopper); }.chips2 .lbl { color:var(--muted); font-size:10px; align-self:center; margin-right:5px; }.budget { display:flex; align-items:center; justify-content:center; gap:10px; margin:18px 0; }.budget input { max-width:40%; accent-color:var(--shopper); }
+.ret { margin:14px auto 0; max-width:560px; text-align:left; }
+.retform { display:flex; gap:8px; margin-top:8px; }.retform input { flex:1; min-width:0; border:1px solid var(--line); border-radius:10px; padding:9px 12px; font:inherit; font-size:12px; background:var(--panel); color:var(--text); }
+.start.small { font-size:12px; padding:9px 16px; }
+.retcard { border:1px solid var(--line); border-radius:14px; padding:14px 16px; background:var(--warn-dim); }
+.retcard.ok { background:var(--ok-dim); }.retwhat { font-size:16px; font-weight:600; margin:6px 0 4px; }
+.retcard .sub { font-size:11px; color:var(--muted); margin-bottom:10px; padding:0; }
 .market { margin:6px auto 16px; max-width:640px; text-align:left; }.mk-src { text-transform:none; letter-spacing:0; }
 .mk { list-style:none; padding:0; margin:8px 0 6px; border:1px solid var(--line); border-radius:14px; overflow:hidden; background:var(--panel); }
 .mk li { display:grid; grid-template-columns:96px 1fr auto auto; gap:12px; align-items:center; padding:9px 14px; font-size:12px; border-top:1px solid var(--line); }
@@ -452,12 +458,14 @@ function showComplete(e) {
         <div><b>Jev</b>${esc(LABEL[(e.authority || {}).decision] || "—")} · ${esc((e.authority || {}).source === "jev" ? "live" : "local rules (fallback)")}</div>
       </div>
       <div class="track" id="track"></div>
+      <div class="ret" id="ret"><button class="ghost" id="returnBtn" disabled title="Available once it's delivered">Start a return · after delivery</button></div>
       <div class="actions"><button class="ghost" id="transcriptBtn">Review negotiation</button><button class="ghost" id="whyBtn">Why this deal?</button><div id="whyBox"></div>
         <button class="again" id="againBtn">Find another deal</button></div>
     </div>`;
   $("whyBtn").onclick = toggleWhy;
   $("transcriptBtn").onclick = () => { const show = document.body.classList.toggle("review-timeline"); $("transcriptBtn").textContent = show ? "Hide negotiation" : "Review negotiation"; };
   $("againBtn").onclick = () => start();
+  $("returnBtn").onclick = openReturn;
   renderTracking();
 }
 
@@ -636,6 +644,7 @@ async function start(intakeId = null) {
     else if (e.type === "quotes") onQuotes(e);
     else if (e.type === "market") onMarket(e);
     else if (e.type === "tracking") onTracking(e);
+    else if (e.type === "return") onReturn(e);
     else if (e.type === "near_miss" && e.decision?.decision === "WALK_AWAY")
       $("room").insertAdjacentHTML("beforeend", `<div class="msg system">${esc(e.merchant_name)}: best offer ${money(e.offer.price)} is ${money(e.over_by)} over budget → walk away (${esc(e.decision.reason)})</div>`);
     else if (e.type === "trace") onTrace(e);
@@ -744,7 +753,8 @@ function renderTracking() {
     }, 1400);
   };
 }
-function onTracking(e) { tracking[e.stage] = e; renderTracking(); }
+function onTracking(e) {
+  if (e.stage === "delivered" && $("returnBtn")) { $("returnBtn").disabled = false; $("returnBtn").textContent = "Start a return"; } tracking[e.stage] = e; renderTracking(); }
 
 async function refreshWinningMerchant() {
   const current = deal;
@@ -755,6 +765,46 @@ async function refreshWinningMerchant() {
     const chosen = snap.merchants?.find(m => m.id === snap.winner);
     if (chosen) $('merchantName').textContent = `${chosen.name} · ${chosen.runtime === 'ZooWork' ? 'ZooWork runtime' : 'local demo'}`;
   } catch { /* The existing policy panel remains usable if the snapshot is unavailable. */ }
+}
+function openReturn() {
+  $("ret").innerHTML = `<div class="k">Tell your agent what's wrong</div>
+    <form id="retForm" class="retform"><input id="retReason" value="They're uncomfortable after an hour — I'd like a refund" />
+    <button class="start small" type="submit">Ask my agent</button></form>`;
+  $("retForm").onsubmit = async ev => {
+    ev.preventDefault();
+    const reason = $("retReason").value.trim();
+    $("ret").innerHTML = `<div class="k"><span class="spin"></span>Your agent is negotiating the return in the same BAND room…</div>`;
+    const r = await fetch(`/api/deals/${deal.id}/return`, { method: "POST", headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify({ reason }) });
+    if (!r.ok) $("ret").innerHTML = `<div class="k">Couldn't start the return: ${esc((await r.json()).detail || r.status)}</div>`;
+  };
+}
+function onReturn(e) {
+  const box = $("ret"); if (!box) return;
+  const t = e.terms, credit = t ? money(t.amount + (t.goodwill_credit || 0)) : "";
+  const what = t ? (t.resolution === "refund" ? `Full refund · ${money(t.amount)}` :
+    t.resolution === "store_credit" ? `${credit} store credit (${money(t.amount)} + ${money(t.goodwill_credit)} bonus)` :
+    `Exchange + ${money(t.goodwill_credit)} credit`) : "";
+  if (e.phase === "negotiating") pushStep("RETURN", "same BAND room", "jev");
+  if (e.phase === "checking_authority") box.innerHTML = `<div class="k"><span class="spin"></span>Agreed: ${esc(what)} · authority check…</div>`;
+  if (e.phase === "awaiting_approval") {
+    const a = e.authority || {};
+    box.innerHTML = `<div class="retcard"><div class="k">Return resolution · needs you</div>
+      <div class="retwhat">${esc(what)}</div>
+      <div class="sub">Instead of a ${money(t.amount)} refund. ${esc(a.source_label || "")}: ${esc(a.reason || "")}</div>
+      <button class="start small" id="retApprove">Accept ${credit} credit</button></div>`;
+    pushStep("RETURN · YOUR CALL", "jev", "jev");
+    $("retApprove").onclick = async () => {
+      $("retApprove").disabled = true;
+      await fetch(`/api/deals/${deal.id}/return/approve`, { method: "POST" });
+    };
+  }
+  if (e.phase === "resolved") {
+    box.innerHTML = `<div class="retcard ok"><div class="k">Return resolved · simulated</div>
+      <div class="retwhat">${esc(e.summary)}</div><div class="sub">Approved by ${e.approved_by === "human" ? "you" : "policy"} · posted to the BAND deal room</div></div>`;
+    pushStep("RETURN RESOLVED", what.toLowerCase(), "final");
+  }
+  if (e.phase === "rejected") box.innerHTML = `<div class="retcard"><div class="k">Return escalated to the store</div><div class="sub">${esc(e.authority?.reason || "")}</div></div>`;
 }
 function onQuotes(e) {
   refreshWinningMerchant();
