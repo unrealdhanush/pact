@@ -152,3 +152,18 @@ async def test_limit_edit_api_and_product_assets(monkeypatch):
         for name in ("sony-wh1000xm5", "bose-qc-ultra", "sennheiser-m4"):
             r = await client.get(f"/assets/{name}.png")
             assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+
+
+@pytest.mark.parametrize("text,expect", [
+    ("Hi", "What are you looking for"),
+    ("hello there", "What are you looking for"),
+    ("what can you do?", "I'm your shopping agent"),
+    ("thanks!", "You're welcome"),
+    ("I need a gift for my dad", "couldn't match"),
+])
+async def test_small_talk_does_not_trigger_a_product_search(text, expect):
+    it = Intake()
+    v = await it.turn(text)
+    assert expect in v["reply"] and v["product"] is None and v["options"] == [] and v["recalled"] == []
+    v = await it.turn("Find me Sony noise-cancelling headphones in black, under 300, by Tuesday")
+    assert v["product"]["name"] == "Sony WH-1000XM5"  # then a real request works in the same chat

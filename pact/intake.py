@@ -81,6 +81,27 @@ def parse(utterance: str, today: date | None = None) -> dict:
     return out
 
 
+MIN_PRODUCT_SCORE = 0.3
+_GREETING = re.compile(r"^\s*(hi|hey|hello|hiya|yo|good (morning|afternoon|evening)|sup)\b", re.I)
+_THANKS = re.compile(r"\b(thanks|thank you|thx|cheers)\b", re.I)
+_HELP = re.compile(r"\b(what can you do|help|how does this work|who are you|what are you)\b", re.I)
+EXAMPLE = "“Sony noise-cancelling headphones in black, under $300, by Tuesday”"
+
+
+def small_talk(text: str) -> str:
+    """Reply when the message isn't a shopping request (no product match, no budget/colour/date)."""
+    if _THANKS.search(text):
+        return "You're welcome! Tell me whenever you want me to find or return something."
+    if _HELP.search(text):
+        return ("I'm your shopping agent. Tell me what you want and your limits — I'll find options, check prices "
+                "across the web, negotiate with merchant agents for you, and ask before spending above your "
+                f"limit. Try {EXAMPLE}.")
+    if _GREETING.match(text):
+        return f"Hi! I'm your shopping agent. What are you looking for? For example: {EXAMPLE}."
+    return (f"I couldn't match that to anything I can shop for yet — right now I can find headphones. "
+            f"Try {EXAMPLE}.")
+
+
 @dataclass
 class Boundary:
     value: object
@@ -118,12 +139,17 @@ class Intake:
             from moss import DocumentInfo
             await self.session.add_docs([DocumentInfo(id=f"turn-{len(self.turns)}", text=text)])
 
-        for k, v in parse(text).items():  # what the human says always wins
+        parsed = parse(text)
+        for k, v in parsed.items():  # what the human says always wins
             self.fields[k] = Boundary(v, "you")
 
         if self.product is None:
             hits, ms = await memory.search_catalog(text, top_k=5)
             self.timings["catalog_ms"] = round(ms, 1)
+            # Semantic search always returns *something*; only treat it as a shopping request
+            # if it actually matches the catalog (chat like "hi" scores ~0, requests 0.6+).
+            if (not hits or hits[0].score < MIN_PRODUCT_SCORE) and not parsed:
+                return self.view(small_talk(text))
             self.options = [self._card(h) for h in hits]
             # top 3 the merchant can actually negotiate, best match first; default selection = first
             carried = [o for o in self.options if o["carried"]][:3]
