@@ -28,7 +28,7 @@ def scenario():
 
 @app.post("/api/deals")
 async def create_deal(pace: float = 1.2):
-    return store.create(pace=pace).snapshot()
+    return (await store.create(pace=pace)).snapshot()
 
 
 def _get(deal_id: str):

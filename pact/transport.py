@@ -20,7 +20,8 @@ class Room(Protocol):
     id: str
     transport_name: str
 
-    def subscribe(self, handler: Handler) -> None: ...
+    def subscribe(self, handler: Handler, as_participant: str | None = None) -> None:
+        """Participants receive messages addressed to them; observers (None) see everything posted."""
 
     async def post(self, sender: str, text: str, payload: BaseModel | None = None,
                    mentions: list[str] | None = None) -> RoomMessage: ...
@@ -35,8 +36,11 @@ class LocalRoom:
         self._handlers: list[Handler] = []
         self._tasks: set[asyncio.Task] = set()
 
-    def subscribe(self, handler: Handler) -> None:
+    def subscribe(self, handler: Handler, as_participant: str | None = None) -> None:
         self._handlers.append(handler)
+
+    def close(self) -> None:
+        pass
 
     async def post(self, sender, text, payload=None, mentions=None) -> RoomMessage:
         msg = RoomMessage(

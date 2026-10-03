@@ -12,6 +12,7 @@ from .agents.shopper import ShopperAgent
 from .agents.zoowork_merchant import ZooWorkMerchantAgent
 from .protocol import Agreement, RoomMessage
 from .scenario import MerchantState, Product, ShopperState
+from .band import BandRoom, load_band_agents
 from .transport import LocalRoom
 from .zoowork import load_agent_id
 
@@ -29,8 +30,19 @@ class Deal:
         self.decision: jev.JevDecision | None = None
         self.events: list[dict] = []
         self._queues: set[asyncio.Queue] = set()
+        self.pace = pace
+        self.room = None
 
+    async def setup(self) -> None:
+        """Open the negotiation room (BAND, else labelled local fallback) and seat both agents."""
+        pace = self.pace
         self.room = LocalRoom(self.id)
+        self.room_note = ""
+        if os.environ.get("PACT_TRANSPORT", "band") == "band" and load_band_agents():
+            try:
+                self.room = await BandRoom.create(self.id, f"Pact {self.id.upper()} · Aria ANC Headphones")
+            except Exception as e:
+                self.room_note = f"BAND unavailable ({type(e).__name__}); using local room"
         self.room.subscribe(self._on_room_message)
         self.shopper = ShopperAgent(self.room, self._trace, self.shopper_state, self.product,
                                     on_agreement=self._on_agreement, pace=pace)
@@ -77,6 +89,7 @@ class Deal:
             self._execute()
         elif self.decision.decision == "REJECT":
             self.status = "rejected"
+            self.room.close()
             self.emit("status", status=self.status, agreement=agreement.model_dump(mode="json"))
         else:
             self.status = "awaiting_approval"
@@ -87,6 +100,7 @@ class Deal:
     def snapshot(self) -> dict:
         return {
             "id": self.id, "status": self.status, "transport": self.room.transport_name,
+            "band_chat_id": getattr(self.room, "chat_id", None),
             "merchant_runtime": self.merchant_runtime,
             "product": asdict(self.product),
             "shopper": _jsonable(asdict(self.shopper_state)),
@@ -94,7 +108,11 @@ class Deal:
         }
 
     async def run(self) -> None:
+        if self.room is None:
+            await self.setup()
         self.emit("status", status=self.status)
+        if self.room_note:
+            self._trace("shopper", "think", self.room_note)
         await self.shopper.start()
 
     def why(self) -> list[str]:
@@ -119,6 +137,7 @@ class Deal:
         checkout = tools.create_checkout(terms)
         self._trace("merchant", "tool", f"create_checkout(${terms.price:.0f}) → {checkout['order_id']}")
         self.status = "complete"
+        self.room.close()
         self.emit("status", status=self.status, agreement=self.agreement.model_dump(mode="json"),
                   execution={"order_id": checkout["order_id"], "simulated": True})
         return checkout
@@ -140,8 +159,9 @@ class DealStore:
         self.deals: dict[str, Deal] = {}
         self._tasks: set[asyncio.Task] = set()
 
-    def create(self, pace: float = 1.2) -> Deal:
+    async def create(self, pace: float = 1.2) -> Deal:
         deal = Deal(pace=pace)
+        await deal.setup()
         self.deals[deal.id] = deal
         task = asyncio.create_task(deal.run())
         self._tasks.add(task)

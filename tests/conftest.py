@@ -7,3 +7,4 @@ def offline(monkeypatch):
     monkeypatch.setenv("PACT_MERCHANT", "local")
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
     monkeypatch.delenv("JEV_API_KEY", raising=False)
+    monkeypatch.setenv("PACT_TRANSPORT", "local")
