@@ -112,7 +112,7 @@ async def test_remote_gate_failure_falls_back(monkeypatch):
     deal = Deal(pace=0)
     await deal.run()
     await settle(deal)
-    assert deal.authority["source"] == "local" and "RuntimeError" in deal.authority["source_label"]
+    assert deal.authority["source"] == "local" and "(jev down)" in deal.authority["source_label"]
 
 
 async def test_store_replaces_fixed_id():
