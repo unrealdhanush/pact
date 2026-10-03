@@ -3,6 +3,13 @@
     "product": "Sony WH-1000XM5",
     "listings": [
       {
+        "retailer": "Walmart",
+        "domain": "walmart.com",
+        "price": 272.95,
+        "title": "Sony Wh-1000xm5 Weight",
+        "url": "https://www.walmart.com/c/kp/sony-wh-1000xm5-weight"
+      },
+      {
         "retailer": "Sony",
         "domain": "sony.com",
         "price": 299.99,
@@ -10,23 +17,16 @@
         "url": "https://electronics.sony.com/audio/headphones/headband/p/wh1000xm5-s"
       },
       {
-        "retailer": "Best Buy",
-        "domain": "bestbuy.com",
-        "price": 299.99,
-        "title": "Sony - WH-1000XM5 Wireless Noise Cancelling Over-the- ...",
-        "url": "https://www.bestbuy.com/product/sony-wh-1000xm5-wireless-noise-cancelling-over-the-ear-headphones-black/J7XSRH5CXG"
-      },
-      {
-        "retailer": "Walmart",
-        "domain": "walmart.com",
-        "price": 309.99,
-        "title": "Sony, Wireless Noise Canceling Headphones, Black, 30-Hour Battery - Walmart.com",
-        "url": "https://www.walmart.com/ip/Sony-WH-1000XM5-The-Best-Wireless-Noise-Canceling-Headphones-Black/386006068"
+        "retailer": "Crutchfield",
+        "domain": "crutchfield.com",
+        "price": 398.0,
+        "title": "Sony WH-1000XM5 (Black)",
+        "url": "https://www.crutchfield.com/p_158100XM5B/Sony-WH-1000XM5-Black.html"
       }
     ],
     "source": "tavily",
-    "checked_at": "2026-10-03T22:46:52+00:00",
-    "ms": 421
+    "checked_at": "2026-10-03T23:02:11+00:00",
+    "ms": 5988
   },
   "sennheiser-m4": {
     "product": "Sennheiser Momentum 4",

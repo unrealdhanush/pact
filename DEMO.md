@@ -2,7 +2,7 @@
 
 Run `uv sync`, then `uv run uvicorn pact.server:app --port 8017` and open http://127.0.0.1:8017.
 
-The frontend uses system fonts and CSS artwork; it has no CDN, font download, or build dependency. The backend and negotiation contracts are unchanged.
+The frontend uses system fonts, local product renders, and a locally bundled map library; it has no font download or frontend build step. The backend and negotiation contracts are unchanged.
 
 ## One-minute preset demo
 
@@ -27,7 +27,9 @@ The shopper's **Budget** and **Ask me above** fields are editable before negotia
 
 Use **Sony XM5**, **Momentum 4**, or **Bose Ultra** to switch preset products. Their original AI-generated 3D-style renders are illustrative product visuals, not interactive 3D models or official manufacturer photos. The existing catalog and merchant economics still determine offers.
 
-After checkout, the delivery map follows the backend's simulated tracking events. **Replay route** previews warehouse → sorting center → destination without changing the order status. This map uses a fictional demo district and needs no map API or location access.
+After checkout, the delivery card follows the backend's simulated tracking events. The courier moves along an embedded real route from South San Francisco through Mission Bay to the Presidio. **Replay route** previews the journey without changing the order status or dates; **Stop preview** returns to the actual tracking stage. Zoom controls and **Show full delivery route** let you inspect the map.
+
+Leaflet is bundled locally. OpenStreetMap supplies tiles when available; if tiles cannot load, a labeled route outline still shows the same road geometry, courier, stops, and progress. No geolocation, carrier feed, or route API is used. The map stays mounted across tracking updates, respects reduced motion, and resizes with the workspace.
 
 ## Second act: the return (≈30 s)
 
