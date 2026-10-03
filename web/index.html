@@ -230,9 +230,17 @@ body.review-timeline .room { height:260px; }
 .track .steps { margin:16px 0 10px; }
 @media(max-width:700px) { .delivery-map { aspect-ratio:620/320; }.route-heading { padding:14px; }.route-footer,.route-time { padding-left:14px; padding-right:14px; }.roomhead { padding-left:20px; padding-right:20px; }.route-heading h3 { font-size:13px; } }
 
+.delivery-map.leaf { aspect-ratio:620/300; background:#eef2f4; }
+.leaf .leaflet-control-attribution { font-size:8px; }
+.gray-tiles, .gray-tiles img { filter:grayscale(1) brightness(1.08) contrast(.85); }
+.van-icon { background:#0071e3; border-radius:50%; box-shadow:0 0 0 6px #0071e325; display:grid; place-items:center; }
+.pin-label { font:600 10px -apple-system,BlinkMacSystemFont,sans-serif; color:#1d1d1f; background:#fff; border-radius:6px; padding:2px 6px; box-shadow:0 1px 4px #0002; white-space:nowrap; }
 a.brand { color:inherit; text-decoration:none; cursor:pointer; }
 a.brand:focus-visible { outline:2px solid var(--shopper); outline-offset:4px; border-radius:6px; }
 </style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
 </head>
 <body class="idle">
 <header><a class="brand" id="brandLink" href="#" aria-label="Pact home">pact</a><div class="tag">Agent commerce.</div><div class="header-end"><button class="header-link" id="homeBtn" hidden>Overview</button><button class="header-link" id="workspaceBtn">Open workspace ↗</button><details class="systems"><summary>Connections</summary><div class="chips" id="chips"><span class="chip deal" id="dealId">No active deal</span></div></details></div></header>
@@ -622,7 +630,7 @@ async function start(intakeId = null) {
   try {
   if (source) source.close();
   document.body.classList.remove("decision", "review-timeline");
-  agreement = authority = null; why = []; steps = []; askedOnce = false; tracking = {};
+  agreement = authority = null; why = []; steps = []; askedOnce = false; tracking = {}; vanAt = 0;
   ["room", "shopperTrace", "merchantTrace"].forEach(id => $(id).innerHTML = "");
   $("stage").innerHTML = `<div class="k"><span class="spin"></span>Opening deal room…</div>`;
   const res = await request(`/api/deals?pace=${pace}&id=${encodeURIComponent(dealParam)}` +
@@ -720,7 +728,44 @@ const TRACK_LABEL = { confirmed: "Confirmed", packed: "Packed", shipped: "Shippe
 let tracking = {};
 let mapReplayTimer = null, mapReplayIndex = null;
 function stopMapReplay() { if (mapReplayTimer) clearInterval(mapReplayTimer); mapReplayTimer = null; mapReplayIndex = null; }
+// Real road route (OSRM, computed once and embedded): Aria Audio fulfillment (South San Francisco) ->
+// Mission Bay sorting hub -> Walt Disney Family Museum, Presidio. 23.6 km.
+const ROUTE = [[37.6547,-122.4077],[37.65471,-122.4077],[37.65505,-122.40744],[37.65498,-122.40688],[37.65502,-122.40662],[37.65523,-122.40649],[37.65606,-122.40635],[37.6566,-122.40616],[37.65895,-122.40506],[37.65983,-122.40443],[37.66074,-122.40351],[37.66146,-122.40251],[37.66378,-122.39891],[37.66448,-122.39795],[37.66528,-122.39702],[37.66608,-122.3962],[37.67005,-122.3924],[37.67092,-122.39166],[37.67181,-122.39097],[37.67273,-122.39035],[37.6734,-122.38994],[37.67436,-122.38941],[37.67513,-122.38904],[37.67612,-122.38864],[37.67715,-122.38838],[37.6782,-122.38828],[37.67925,-122.38836],[37.68029,-122.38857],[37.68236,-122.38899],[37.69346,-122.3915],[37.70134,-122.39327],[37.70636,-122.39441],[37.7079,-122.39475],[37.70942,-122.3951],[37.71122,-122.39551],[37.71175,-122.39567],[37.71224,-122.39586],[37.71274,-122.39611],[37.71321,-122.39641],[37.71366,-122.39675],[37.71521,-122.39802],[37.71566,-122.39833],[37.71615,-122.39859],[37.71664,-122.3988],[37.71715,-122.39897],[37.71972,-122.39966],[37.72164,-122.40027],[37.72396,-122.40122],[37.72625,-122.40193],[37.72841,-122.40266],[37.72906,-122.40295],[37.73006,-122.40344],[37.73248,-122.40457],[37.73363,-122.40502],[37.73443,-122.40501],[37.73519,-122.40475],[37.73588,-122.40425],[37.73687,-122.40292],[37.73758,-122.40195],[37.73842,-122.40105],[37.73939,-122.40011],[37.74365,-122.39624],[37.74446,-122.39536],[37.74543,-122.39449],[37.74644,-122.39379],[37.74692,-122.39349],[37.74999,-122.39177],[37.75047,-122.39155],[37.75097,-122.39138],[37.75149,-122.39127],[37.75201,-122.39122],[37.75253,-122.39122],[37.75305,-122.39127],[37.75357,-122.39139],[37.75486,-122.39184],[37.75538,-122.39199],[37.75589,-122.39211],[37.75642,-122.39219],[37.75695,-122.39223],[37.75837,-122.39222],[37.75897,-122.39222],[37.76007,-122.39227],[37.76114,-122.39229],[37.76221,-122.39229],[37.76354,-122.39245],[37.76415,-122.39218],[37.76419,-122.39154],[37.76428,-122.39013],[37.76434,-122.38907],[37.76436,-122.38885],[37.76507,-122.38883],[37.76564,-122.3889],[37.76652,-122.38893],[37.76703,-122.389],[37.76761,-122.38908],[37.76876,-122.38918],[37.76979,-122.38928],[37.77064,-122.38936],[37.77106,-122.38941],[37.77195,-122.3895],[37.77259,-122.38955],[37.77301,-122.38959],[37.77445,-122.38972],[37.77477,-122.3898],[37.77543,-122.38995],[37.77619,-122.39003],[37.77652,-122.3901],[37.77708,-122.39055],[37.77723,-122.39079],[37.77749,-122.39107],[37.77762,-122.39124],[37.77798,-122.39169],[37.77822,-122.392],[37.77937,-122.39342],[37.7801,-122.39432],[37.78065,-122.39501],[37.78109,-122.39556],[37.78165,-122.39626],[37.7821,-122.39683],[37.7824,-122.3972],[37.7827,-122.39758],[37.78344,-122.39851],[37.78386,-122.39904],[37.78435,-122.39965],[37.78494,-122.40038],[37.78583,-122.40151],[37.78626,-122.40204],[37.78703,-122.40302],[37.78739,-122.4034],[37.78768,-122.40344],[37.78788,-122.40348],[37.78844,-122.40359],[37.78935,-122.40377],[37.78983,-122.40387],[37.79068,-122.40404],[37.79134,-122.40417],[37.79179,-122.40425],[37.79256,-122.40441],[37.79254,-122.40532],[37.79245,-122.40603],[37.79226,-122.40755],[37.79208,-122.40895],[37.79205,-122.40918],[37.79199,-122.40967],[37.79184,-122.41083],[37.79164,-122.41239],[37.79158,-122.4129],[37.79142,-122.41412],[37.7912,-122.41585],[37.79101,-122.41731],[37.7908,-122.41897],[37.7906,-122.42061],[37.79055,-122.42132],[37.79043,-122.42231],[37.79024,-122.42372],[37.79013,-122.42428],[37.78976,-122.42719],[37.78954,-122.42892],[37.78934,-122.43049],[37.78912,-122.43221],[37.78892,-122.43376],[37.78879,-122.43479],[37.7887,-122.4355],[37.78865,-122.43592],[37.78848,-122.43724],[37.78827,-122.43889],[37.78837,-122.44052],[37.78977,-122.4408],[37.78999,-122.44085],[37.79068,-122.44098],[37.79154,-122.44116],[37.79171,-122.44119],[37.79252,-122.44136],[37.79344,-122.44154],[37.79439,-122.44173],[37.79525,-122.44191],[37.79615,-122.44209],[37.79709,-122.44228],[37.79729,-122.44232],[37.7982,-122.4425],[37.79889,-122.44264],[37.79901,-122.44302],[37.79887,-122.44415],[37.79886,-122.44446],[37.79888,-122.44473],[37.79884,-122.44497],[37.79872,-122.44527],[37.79862,-122.44608],[37.79849,-122.4471],[37.79846,-122.44746],[37.79843,-122.44767],[37.79835,-122.44792],[37.79821,-122.44807],[37.79791,-122.44829],[37.79778,-122.44845],[37.79763,-122.44875],[37.79753,-122.44909],[37.79744,-122.44958],[37.79745,-122.45017],[37.79757,-122.45073],[37.79765,-122.45101],[37.79761,-122.45127],[37.79793,-122.45145],[37.79834,-122.45171],[37.79877,-122.45208],[37.79892,-122.45228],[37.7993,-122.45269],[37.79953,-122.45281],[37.79994,-122.45291],[37.80007,-122.45296],[37.80019,-122.45305],[37.80029,-122.45317],[37.80035,-122.45326],[37.80054,-122.45363],[37.80059,-122.45372],[37.80063,-122.45372],[37.80067,-122.45374],[37.80069,-122.45378],[37.8007,-122.45382],[37.80069,-122.45386],[37.80067,-122.45389],[37.80069,-122.45407],[37.80098,-122.45482],[37.80127,-122.45551],[37.80162,-122.45629],[37.80171,-122.45656],[37.80177,-122.45693],[37.80197,-122.45764],[37.80196,-122.45788],[37.802,-122.45808],[37.80212,-122.45847],[37.80147,-122.45905]];
+const ROUTE_HUB = 97;
+const STAGE_AT = [0, 0, ROUTE_HUB, Math.round(ROUTE_HUB + (ROUTE.length - 1 - ROUTE_HUB) * 0.6), ROUTE.length - 1];
+let leafMap = null, vanAt = 0, vanAnim = null;
+function mountLeaflet(stage) {
+  const el = $("leafmap"); if (!el || !window.L) return;
+  if (leafMap) { leafMap.remove(); leafMap = null; }
+  if (vanAnim) cancelAnimationFrame(vanAnim);
+  leafMap = L.map(el, { zoomControl: false, attributionControl: true, scrollWheelZoom: false, dragging: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false });
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, className: "gray-tiles",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(leafMap);
+  L.polyline(ROUTE, { color: "#a9c7ec", weight: 5, opacity: .9 }).addTo(leafMap);
+  // never drive backwards except during an explicit "Replay route" preview
+  const replaying = mapReplayIndex != null;
+  const target = replaying ? STAGE_AT[stage] : Math.max(vanAt, STAGE_AT[stage]);
+  const done = L.polyline(ROUTE.slice(0, vanAt + 1), { color: "#0071e3", weight: 5 }).addTo(leafMap);
+  const pin = (ll, text) => L.marker(ll, { icon: L.divIcon({ className: "", html: `<span class="pin-label">${text}</span>`, iconSize: null, iconAnchor: [-8, 10] }) }).addTo(leafMap);
+  [[ROUTE[0], "Warehouse · South SF"], [ROUTE[ROUTE_HUB], "Sorting hub · Mission Bay"], [ROUTE[ROUTE.length - 1], "Walt Disney Family Museum"]]
+    .forEach(([ll, t]) => { L.circleMarker(ll, { radius: 5, color: "#0071e3", weight: 2, fillColor: "#fff", fillOpacity: 1 }).addTo(leafMap); pin(ll, t); });
+  const vanSvg = '<svg width="16" height="16" viewBox="-10 -9 20 18" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"><path d="M-8-5H3V5H-8Z M3-2H6L9 1V5H3"/><circle cx="-4" cy="6" r="2" fill="#0071e3"/><circle cx="6" cy="6" r="2" fill="#0071e3"/></svg>';
+  const van = L.marker(ROUTE[vanAt], { icon: L.divIcon({ className: "van-icon", html: vanSvg, iconSize: [30, 30], iconAnchor: [15, 15] }), zIndexOffset: 1000 }).addTo(leafMap);
+  leafMap.fitBounds(L.latLngBounds(ROUTE), { padding: [28, 28] });
+  // drive along the real road from where the van was to this stage
+  const from = vanAt, t0 = performance.now(), dur = Math.min(2600, 400 + Math.abs(target - from) * 14);
+  if (document.hidden || target === from) {  // background tabs pause animation frames: just place it
+    van.setLatLng(ROUTE[target]); done.setLatLngs(ROUTE.slice(0, target + 1)); vanAt = target; return;
+  }
+  const step = now => {
+    const k = Math.min(1, (now - t0) / dur), i = Math.round(from + (target - from) * (1 - Math.pow(1 - k, 3)));
+    van.setLatLng(ROUTE[i]); done.setLatLngs(ROUTE.slice(0, i + 1)); vanAt = i;
+    if (k < 1) vanAnim = requestAnimationFrame(step);
+  };
+  vanAnim = requestAnimationFrame(step);
+}
 function shippingMap(stage) {
+  if (window.L) return `<div id="leafmap" class="delivery-map leaf" role="img" aria-label="Delivery route map, current stage: ${TRACK_LABEL[TRACK_STAGES[stage]]}"></div>`;
   const points = [[95,170],[95,170],[285,120],[430,120],[525,65]], [x,y] = points[stage];
   const road = 'M95 170H185V120H430V65H525';
   const progress = [0,0,44,72,100][stage];
@@ -742,11 +787,12 @@ function renderTracking() {
   const latestIndex = Math.max(...TRACK_STAGES.map((stage, i) => tracking[stage] ? i : -1));
   if (latestIndex < 0) return;
   const last = tracking[TRACK_STAGES[latestIndex]], shown = mapReplayIndex ?? latestIndex;
-  box.innerHTML = `<div class="route-card"><div class="route-heading"><div><h3>Your delivery, on the way</h3><p>${esc(last.merchant_name || 'Merchant')} · ${esc(last.tracking_no)}</p></div><span class="route-stage">${mapReplayIndex != null ? 'Route preview' : TRACK_LABEL[TRACK_STAGES[latestIndex]]}</span></div>${shippingMap(shown)}<div class="route-footer"><span>Warehouse → sorting center → destination</span><span class="src default">SIMULATED</span></div><div class="route-time"><span>${agreement?.terms?.delivery_date ? 'Arrives ' + day(agreement.terms.delivery_date) : 'Demo delivery route'}</span><button class="route-replay" id="mapReplayBtn">${mapReplayIndex != null ? 'Stop preview' : 'Replay route'}</button></div></div>
-    <ol class="steps">${TRACK_STAGES.map((stage, i) => `<li class="${i < latestIndex ? 'done' : i === latestIndex ? 'now' : ''}"><b>${TRACK_LABEL[stage]}</b><small>${tracking[stage] ? day(tracking[stage].date) : ''}</small></li>`).join('')}</ol><div class="tl" role="status">${esc(last.label)}</div><div class="route-legend">Illustrative demo route. No real location or carrier data is used.</div>`;
+  box.innerHTML = `<div class="route-card"><div class="route-heading"><div><h3>Your delivery, on the way</h3><p>${esc(last.merchant_name || 'Merchant')} · ${esc(last.tracking_no)}</p></div><span class="route-stage">${mapReplayIndex != null ? 'Route preview' : TRACK_LABEL[TRACK_STAGES[latestIndex]]}</span></div>${shippingMap(shown)}<div class="route-footer"><span>${window.L ? "South San Francisco → Mission Bay → Presidio · real roads, simulated courier" : "Warehouse → sorting center → destination"}</span><span class="src default">SIMULATED</span></div><div class="route-time"><span>${agreement?.terms?.delivery_date ? 'Arrives ' + day(agreement.terms.delivery_date) : 'Demo delivery route'}</span><button class="route-replay" id="mapReplayBtn">${mapReplayIndex != null ? 'Stop preview' : 'Replay route'}</button></div></div>
+    <ol class="steps">${TRACK_STAGES.map((stage, i) => `<li class="${i < latestIndex ? 'done' : i === latestIndex ? 'now' : ''}"><b>${TRACK_LABEL[stage]}</b><small>${tracking[stage] ? day(tracking[stage].date) : ''}</small></li>`).join('')}</ol><div class="tl" role="status">${esc(last.label)}</div><div class="route-legend">${window.L ? "Real roads (OpenStreetMap); the courier and timing are simulated — no carrier data is used." : "Illustrative demo route. No real location or carrier data is used."}</div>`;
+  mountLeaflet(shown);
   $('mapReplayBtn').onclick = () => {
     if (mapReplayTimer) { stopMapReplay(); renderTracking(); return; }
-    mapReplayIndex = 0; renderTracking();
+    mapReplayIndex = 0; vanAt = 0; renderTracking();
     mapReplayTimer = setInterval(() => {
       if (mapReplayIndex >= 4) { stopMapReplay(); renderTracking(); return; }
       mapReplayIndex++; renderTracking();
