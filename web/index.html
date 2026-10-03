@@ -128,7 +128,7 @@ const pace = new URLSearchParams(location.search).get("pace") || "1.2";
 let deal = null, source = null, listPrice = 249, lastWhy = [];
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const money = n => "$" + Math.round(n);
+const money = n => "$" + (Number.isInteger(+n) ? n : (+n).toFixed(2));
 const shipLabel = s => s === "free_next_day" ? "Free next-day" : "Standard shipping";
 const day = iso => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" });
 const cap = s => s[0].toUpperCase() + s.slice(1);
@@ -142,6 +142,7 @@ function renderRules(snap) {
     ["Deliver by", day(s.delivery_deadline)],
     ["Min returns", s.minimum_return_days + " days"],
     ["Ask me above", money(s.approval_required_above)],
+    ...(s.competitor_price ? [["Found elsewhere", `${money(s.competitor_price)} at ${s.competitor_retailer}`]] : []),
   ].map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
   $("merchantRules").innerHTML = [
     ["List price", money(m.list_price)],
@@ -221,6 +222,10 @@ function onMessage(m) {
 
   const p = m.payload || {};
   if (p.kind === "proposal") pushStep(money(p.requested_price), "shopper asks", "");
+  if (p.kind === "counteroffer" && p.competitor_check) {
+    const c = p.competitor_check, how = c.source === "cache" ? "cached" : c.source === "tavily" ? "live" : c.source;
+    pushStep((c.verified ? "✓ " : "✗ ") + money(c.claimed_price), `${c.retailer} · Tavily ${how}`);
+  }
   if (p.kind === "counteroffer") {
     p.offers.forEach(o => pushStep(money(o.price) + (o.shipping === "free_next_day" ? " + free ship" : ""), o.variant));
     const best = p.offers[p.offers.length - 1];

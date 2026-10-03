@@ -17,6 +17,11 @@ class Offer(BaseModel):
     return_window_days: int
 
 
+class CompetitorClaim(BaseModel):
+    retailer: str
+    price: float
+
+
 class Proposal(BaseModel):
     kind: Literal["proposal"] = "proposal"
     transaction_id: str
@@ -27,6 +32,7 @@ class Proposal(BaseModel):
     delivery_deadline: date
     minimum_return_days: int
     requires_human_approval: bool
+    competitor_claim: CompetitorClaim | None = None
 
 
 class Counteroffer(BaseModel):
@@ -37,6 +43,8 @@ class Counteroffer(BaseModel):
     merchant_margin_valid: bool
     requires_human_approval: bool
     explanation: list[str]
+    # Public result of verifying the shopper's competitor claim (Tavily), if one was made.
+    competitor_check: dict | None = None
 
 
 class ConditionalAccept(BaseModel):

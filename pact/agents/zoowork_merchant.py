@@ -12,6 +12,7 @@ import re
 import time
 
 from .. import engine
+from ..engine import money
 from ..protocol import Agreement, ConditionalAccept, Offer, Proposal, Rejection
 from ..zoowork import ZooWorkClient, ZooWorkError
 from .merchant import SHOPPER, MerchantAgent
@@ -26,6 +27,11 @@ CUSTOM_TOOLS = [
      "input_schema": _EMPTY},
     {"name": "get_margin_constraints",
      "description": "Merchant margin floor, autonomous discount cap, scarcity floors and max return window. Private.",
+     "input_schema": _EMPTY},
+    {"name": "verify_competitor_price",
+     "description": ("If the shopper cited a competitor price (payload.competitor_claim), verify it with a live "
+                     "Tavily web search of that retailer. Returns whether the price is confirmed, the source page "
+                     "and whether the result is live or cached. Call before evaluate_shopper_message."),
      "input_schema": _EMPTY},
     {"name": "evaluate_shopper_message",
      "description": ("Run the merchant pricing engine on the shopper's latest structured message. Returns the "
@@ -57,7 +63,8 @@ INSTRUCTIONS = """You are MerchantAgent, the sales agent for Aria Audio, negotia
 close the sale while protecting margin and moving overstocked inventory.
 
 Each user message is a message from @ShopperAgent plus its structured payload. For every turn:
-1. Call get_inventory and get_margin_constraints.
+1. Call get_inventory and get_margin_constraints. If the payload has a competitor_claim, also call \
+verify_competitor_price.
 2. Call evaluate_shopper_message. Its terms are binding: never offer a price, colour, shipping or return \
 window that it did not return.
 3. Call send_message once with a concise reply (1-3 sentences) to the shopper: state each offered term \
@@ -102,7 +109,7 @@ class ZooWorkMerchantAgent(MerchantAgent):
             await super().handle(payload)
 
     async def _zoowork_turn(self, payload) -> None:
-        self._pending, self._result, self._sent = payload, None, False
+        self._pending, self._result, self._sent, self._check = payload, None, False, None
         if not self.session_id:
             self.session_id = await self.client.create_session(self.agent_id, {"deal": self.room.id})
             self.think(f"ZooWork session {self.session_id[:12]}… opened")
@@ -140,8 +147,11 @@ class ZooWorkMerchantAgent(MerchantAgent):
             self.tool(f"get_margin_constraints() → min margin {out['min_margin_pct']:.0f}%, "
                       f"max auto-discount {out['max_auto_discount_pct']:.0f}%")
             return out
+        if name == "verify_competitor_price":
+            check = await self._verify()
+            return check.model_dump() if check else {"note": "no competitor price was cited"}
         if name == "evaluate_shopper_message":
-            result, notes = self._evaluate()
+            result, notes = await self._evaluate()
             self.tool(f"evaluate_shopper_message() → {result.kind}")
             for n in notes:
                 self.think(n)
@@ -149,19 +159,25 @@ class ZooWorkMerchantAgent(MerchantAgent):
         if name == "calculate_offer_margin":
             offer = Offer(delivery_date=self._pending_date(), **args)
             out = self.tools.calculate_offer_margin(offer)
-            self.tool(f"calculate_offer_margin({args['variant']}, ${args['price']:.0f}) → "
+            self.tool(f"calculate_offer_margin({args['variant']}, {money(args['price'])}) → "
                       f"{out['margin_pct']}% margin")
             return out
         if name == "send_message":
             return await self._send(args["text"])
         raise ValueError(f"unknown tool {name}")
 
-    def _evaluate(self):
+    async def _verify(self):
+        if self._check is None and isinstance(self._pending, Proposal):
+            self._check = await self.verify_claim(self._pending)
+        return self._check
+
+    async def _evaluate(self):
         if self._result is None:
             p = self._pending
             if isinstance(p, Proposal):
                 from datetime import date
-                self._result, notes = engine.evaluate_proposal(self.state, p, date.today())
+                check = await self._verify()  # verify even if the model skipped the tool
+                self._result, notes = engine.evaluate_proposal(self.state, p, date.today(), check)
             else:
                 self._result, notes = engine.evaluate_conditions(self.state, p)
             self._record_reasons()
@@ -186,7 +202,7 @@ class ZooWorkMerchantAgent(MerchantAgent):
     async def _send(self, text: str) -> dict:
         if self._sent:
             return {"ok": False, "error": "already sent this turn"}
-        result, _ = self._evaluate()  # terms are always the engine's, even if the model skipped evaluation
+        result, _ = await self._evaluate()  # terms are always the engine's, even if the model skipped evaluation
         leak = self._leak(text)
         if leak:
             self.think(f"Blocked reply leaking private data ({leak}); using safe template")
@@ -214,8 +230,8 @@ class ZooWorkMerchantAgent(MerchantAgent):
             return f"{result.reason}."
         if hasattr(result, "terms"):
             t = result.terms
-            return (f"Accepted: ${t.price:.0f}, {t.variant}, "
+            return (f"Accepted: {money(t.price)}, {t.variant}, "
                     f"{'free next-day delivery' if t.shipping == 'free_next_day' else 'standard shipping'}, "
                     f"{t.return_window_days}-day returns.")
-        return " ".join(f"{o.variant.capitalize()} at ${o.price:.0f}, {o.return_window_days}-day returns."
+        return " ".join(f"{o.variant.capitalize()} at {money(o.price)}, {o.return_window_days}-day returns."
                         for o in result.offers)

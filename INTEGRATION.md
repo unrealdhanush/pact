@@ -31,8 +31,8 @@ BAND messages carry only text and mentions, so every Pact message is:
 
 | Step | Sender | `kind` | Notes |
 |---|---|---|---|
-| 1 | Shopper | `proposal` | `requested_price`, `preferred_variant`, `acceptable_variants`, `delivery_deadline` (ISO date), `minimum_return_days` |
-| 2 | Merchant | `counteroffer` | `offers[]`: each `{price, variant, shipping, delivery_date, return_window_days}`. All are inside merchant authority. |
+| 1 | Shopper | `proposal` | `requested_price`, `preferred_variant`, `acceptable_variants`, `delivery_deadline` (ISO date), `minimum_return_days`, optional `competitor_claim: {retailer, price}` (e.g. `{"retailer": "sony.com", "price": 299.99}`); the merchant verifies it with Tavily |
+| 2 | Merchant | `counteroffer` | `offers[]`: each `{price, variant, shipping, delivery_date, return_window_days}`. All are inside merchant authority. `competitor_check` = Tavily result (`verified`, `found_price`, `source_url`, `source`: live/cache) |
 | 3 | Shopper | `conditional_accept` | Picks one `offer`; `conditions` = term changes it needs (e.g. `{"return_window_days": 45}`), or `{}` to accept as-is |
 | 4 | Merchant | `merchant_accept` or `rejection` | `terms` = final offer |
 | 5 | Shopper | `agreement` | `terms`, `list_price`, `shopper_savings`. **This triggers the Jev authority gate** (server-side). |

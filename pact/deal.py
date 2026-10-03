@@ -7,6 +7,7 @@ from dataclasses import asdict
 from typing import Literal
 
 from . import jev
+from .engine import money
 from .agents.merchant import MerchantAgent
 from .agents.shopper import ShopperAgent
 from .agents.zoowork_merchant import ZooWorkMerchantAgent
@@ -40,7 +41,7 @@ class Deal:
         self.room_note = ""
         if os.environ.get("PACT_TRANSPORT", "band") == "band" and load_band_agents():
             try:
-                self.room = await BandRoom.create(self.id, f"Pact {self.id.upper()} · Aria ANC Headphones")
+                self.room = await BandRoom.create(self.id, f"Pact {self.id.upper()} · {self.product.name}")
             except Exception as e:
                 self.room_note = f"BAND unavailable ({type(e).__name__}); using local room"
         self.room.subscribe(self._on_room_message)
@@ -135,7 +136,7 @@ class Deal:
         reservation = tools.reserve_inventory(terms.variant)
         self._trace("merchant", "tool", f"reserve_inventory({terms.variant}) → {reservation['remaining']} left")
         checkout = tools.create_checkout(terms)
-        self._trace("merchant", "tool", f"create_checkout(${terms.price:.0f}) → {checkout['order_id']}")
+        self._trace("merchant", "tool", f"create_checkout({money(terms.price)}) → {checkout['order_id']}")
         self.status = "complete"
         self.room.close()
         self.emit("status", status=self.status, agreement=self.agreement.model_dump(mode="json"),
