@@ -133,8 +133,11 @@ async def verify_competitor_price(product: str, retailer: str, claimed: float) -
     if check.verified:  # keep the last good live result as the offline fallback
         cache = _load_cache()
         cache[_cache_key(product, retailer)] = check.model_dump(exclude={"verified", "claimed_price", "source"})
-        CACHE_FILE.parent.mkdir(exist_ok=True)
-        CACHE_FILE.write_text(json.dumps(cache, indent=2))
+        try:  # read-only filesystems (Vercel) just skip the cache
+            CACHE_FILE.parent.mkdir(exist_ok=True)
+            CACHE_FILE.write_text(json.dumps(cache, indent=2))
+        except OSError:
+            pass
     return check
 
 
@@ -215,6 +218,9 @@ async def market_prices(product_id: str, name: str, query: str, match: tuple[str
         return fallback
     _market_mem[product_id] = (now, data)
     saved[product_id] = data
-    MARKET_FILE.parent.mkdir(exist_ok=True)
-    MARKET_FILE.write_text(json.dumps(saved, indent=2))
+    try:  # read-only filesystems (Vercel) just skip the cache
+        MARKET_FILE.parent.mkdir(exist_ok=True)
+        MARKET_FILE.write_text(json.dumps(saved, indent=2))
+    except OSError:
+        pass
     return data

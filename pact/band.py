@@ -463,7 +463,7 @@ async def bootstrap_agents(request: Request | None = None, cache: Path = AGENT_C
     if cfg:
         return cfg
     key = human_key()
-    if not key:
+    if not key or os.getenv("VERCEL"):  # never self-register agents on serverless; use env agent keys
         return None
     request = request or urllib_request
     base = os.getenv("BAND_BASE_URL", BandConfig.base_url).rstrip("/")
