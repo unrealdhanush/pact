@@ -123,3 +123,16 @@ async def test_store_replaces_fixed_id():
     assert store.deals["deal-1842"] is b and a is not b
     await settle(b)
     assert b.status == "awaiting_approval"
+
+
+async def test_on_agreement_can_be_awaited_by_a_shopper():
+    from pact import engine
+    deal = Deal(pace=0)
+    await deal.setup()
+    s = deal.shopper_state
+    terms = engine.Offer(price=s.max_price - 1, variant=s.preferred_variant, shipping="free_next_day",
+                         delivery_date=s.delivery_deadline, return_window_days=s.minimum_return_days)
+    agreement = engine.Agreement(transaction_id=deal.id, terms=terms, list_price=deal.product.list_price,
+                                 shopper_savings=deal.product.list_price - terms.price, human_approval_required=True)
+    await deal._on_agreement(agreement)
+    assert deal.authority is not None and deal.status in ("awaiting_approval", "complete", "failed")
