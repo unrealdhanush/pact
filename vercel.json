@@ -2,13 +2,13 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "",
-  "buildCommand": "node scripts/build-vercel.mjs",
-  "outputDirectory": "dist",
+  "buildCommand": "",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.py": { "maxDuration": 300 }
+  },
   "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://issn-article-practical-hong.trycloudflare.com/api/:path*"
-    }
+    { "source": "/(.*)", "destination": "/api/index" }
   ],
   "headers": [
     { "source": "/api/:path*", "headers": [{ "key": "Cache-Control", "value": "no-store" }] },
