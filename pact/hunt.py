@@ -22,7 +22,7 @@ from .scenario import ShopperState
 log = logging.getLogger("pact.hunt")
 
 PREFERENCES = ("best", "cheapest", "fastest")
-CHILD_ALWAYS = {"message", "trace", "room", "memory", "near_miss", "tracking", "return"}  # forwarded from every room
+CHILD_ALWAYS = {"message", "trace", "room", "memory", "near_miss", "tracking", "return", "return_tracking"}  # forwarded from every room
 CHILD_WINNER = {"phase", "authority", "status"}  # forwarded only from the winning room
 NEGOTIATION_TIMEOUT_S = 90
 
@@ -103,6 +103,16 @@ class Hunt:
         if not self.winner:
             raise ValueError("No order to return")
         return self.winner.approve_return(by)
+
+    def choose_dropoff(self, location_id: str) -> dict:
+        if not self.winner:
+            raise ValueError("No order to return")
+        return self.winner.choose_dropoff(location_id)
+
+    def mark_dropped(self) -> None:
+        if not self.winner:
+            raise ValueError("No order to return")
+        self.winner.mark_dropped()
 
     def approve(self) -> dict:
         if not self.winner:

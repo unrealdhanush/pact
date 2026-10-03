@@ -137,6 +137,29 @@ body.decision .stage { border:0; flex:1; padding:28px; }
 .retcard { border:1px solid var(--line); border-radius:14px; padding:14px 16px; background:var(--warn-dim); }
 .retcard.ok { background:var(--ok-dim); }.retwhat { font-size:16px; font-weight:600; margin:6px 0 4px; }
 .retcard .sub { font-size:11px; color:var(--muted); margin-bottom:10px; padding:0; }
+.retfull { max-width:none; }.ret-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
+.dropby { text-align:right; min-width:92px; }.dropby span { display:block; font-size:10px; color:var(--muted); }.dropby b { display:block; font-size:18px; }.dropby small { font-size:10px; color:var(--muted); }
+.ret-steps { margin:8px 0 0; padding-left:18px; font-size:12px; color:var(--text); line-height:1.6; }
+.drop-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; margin-top:8px; }
+.drops { display:flex; flex-direction:column; gap:8px; }
+.drop { display:flex; gap:10px; border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:var(--panel); cursor:pointer; transition:border-color .15s, background .15s; }
+.drop:hover { border-color:#c7c7cc; }.drop.sel { border-color:var(--shopper); background:var(--shopper-dim); }
+.drop input { margin-top:3px; accent-color:var(--shopper); }.drop-main { flex:1; min-width:0; }
+.drop-top { display:flex; justify-content:space-between; gap:8px; font-size:13px; }.drop-sub { font-size:11px; color:var(--muted); margin-top:2px; }
+.carrier { font:600 9px var(--mono); padding:2px 6px; border-radius:5px; }.carrier.usps { background:#eef6ff; color:#0071e3; }.carrier.ups { background:var(--warn-dim); color:var(--warn); }
+.drop-links { display:flex; gap:12px; margin-top:6px; font-size:11px; }.drop-links a { color:var(--shopper); text-decoration:none; }.drop-links a:hover { text-decoration:underline; }
+.retmap { min-height:260px; border-radius:12px; overflow:hidden; border:1px solid var(--line); }
+.label-card { display:flex; gap:16px; align-items:center; margin-top:14px; border:1px dashed #c7c7cc; border-radius:14px; padding:14px; background:var(--panel); }
+.qr svg { width:132px; height:132px; display:block; }.noqr { width:132px; height:132px; display:grid; place-items:center; background:var(--panel2); color:var(--muted); }
+.label-info { flex:1; min-width:0; }.lbl-track { font:600 15px var(--mono); margin:4px 0; letter-spacing:.02em; }
+.ret-track { list-style:none; margin:14px 0 0; padding:0 0 0 4px; display:block; }
+.ret-track li { position:relative; padding:0 0 12px 22px; font-size:12px; color:var(--muted); }
+.ret-track li::before { content:""; position:absolute; left:4px; top:5px; width:10px; height:10px; border-radius:50%; background:var(--panel); border:2px solid var(--line); }
+.ret-track li::after { content:""; position:absolute; left:9px; top:17px; bottom:0; width:2px; background:var(--line); }
+.ret-track li:last-child::after { display:none; }
+.ret-track li.done::before { background:var(--ok); border-color:var(--ok); }.ret-track li.now::before { background:var(--panel); border-color:var(--ok); box-shadow:0 0 0 4px var(--ok-dim); }
+.ret-track li b { color:var(--text); font-weight:600; font-size:13px; }.ret-track li small { display:block; margin-top:2px; }
+@media(max-width:760px) { .drop-grid { grid-template-columns:1fr; } .label-card { flex-direction:column; align-items:flex-start; } }
 .market { margin:6px auto 16px; max-width:640px; text-align:left; }.mk-src { text-transform:none; letter-spacing:0; }
 .mk { list-style:none; padding:0; margin:8px 0 6px; border:1px solid var(--line); border-radius:14px; overflow:hidden; background:var(--panel); }
 .mk li { display:grid; grid-template-columns:96px 1fr auto auto; gap:12px; align-items:center; padding:9px 14px; font-size:12px; border-top:1px solid var(--line); }
@@ -240,6 +263,7 @@ a.brand:focus-visible { outline:2px solid var(--shopper); outline-offset:4px; bo
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" crossorigin=""></script>
 
 </head>
 <body class="idle">
@@ -630,7 +654,7 @@ async function start(intakeId = null) {
   try {
   if (source) source.close();
   document.body.classList.remove("decision", "review-timeline");
-  agreement = authority = null; why = []; steps = []; askedOnce = false; tracking = {}; vanAt = 0;
+  agreement = authority = null; why = []; steps = []; askedOnce = false; tracking = {}; vanAt = 0; retTracking = {};
   ["room", "shopperTrace", "merchantTrace"].forEach(id => $(id).innerHTML = "");
   $("stage").innerHTML = `<div class="k"><span class="spin"></span>Opening deal room…</div>`;
   const res = await request(`/api/deals?pace=${pace}&id=${encodeURIComponent(dealParam)}` +
@@ -653,6 +677,7 @@ async function start(intakeId = null) {
     else if (e.type === "market") onMarket(e);
     else if (e.type === "tracking") onTracking(e);
     else if (e.type === "return") onReturn(e);
+    else if (e.type === "return_tracking") onReturnTracking(e);
     else if (e.type === "near_miss" && e.decision?.decision === "WALK_AWAY")
       $("room").insertAdjacentHTML("beforeend", `<div class="msg system">${esc(e.merchant_name)}: best offer ${money(e.offer.price)} is ${money(e.over_by)} over budget → walk away (${esc(e.decision.reason)})</div>`);
     else if (e.type === "trace") onTrace(e);
@@ -825,6 +850,78 @@ function openReturn() {
     if (!r.ok) $("ret").innerHTML = `<div class="k">Couldn't start the return: ${esc((await r.json()).detail || r.status)}</div>`;
   };
 }
+let retDetails = null, retMap = null, retPins = {};
+function renderReturnDetails(d, by) {
+  retDetails = d;
+  const opt = o => `<label class="drop" data-id="${o.id}"><input type="radio" name="drop" value="${o.id}">
+      <div class="drop-main"><div class="drop-top"><b>${esc(o.name)}</b><span class="carrier ${o.carrier.toLowerCase()}">${o.carrier}</span></div>
+        <div class="drop-sub">${esc(o.address)} · ${o.mi} mi</div>
+        <div class="drop-sub">${o.hours ? esc(o.hours) : "Hours not listed — check before you go"}</div>
+        <div class="drop-links"><a href="${esc(o.links.apple)}" target="_blank" rel="noopener noreferrer">Apple Maps ↗</a>
+          <a href="${esc(o.links.google)}" target="_blank" rel="noopener noreferrer">Google Maps ↗</a></div></div></label>`;
+  $("ret").innerHTML = `<div class="retcard ok retfull">
+    <div class="ret-head"><div><div class="k">Return ${esc(d.rma)} · approved by ${by === "human" ? "you" : "policy"}</div>
+      <div class="retwhat">You'll get ${esc(d.you_get)}</div><div class="sub">${esc(d.when)}</div></div>
+      <div class="dropby"><span>Drop off by</span><b>${day(d.drop_by)}</b><small>${new Date(d.drop_by + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</small></div></div>
+    <ol class="ret-steps">${d.steps.map(x => `<li>${esc(x)}</li>`).join("")}</ol>
+    <div class="k" style="margin-top:12px">Drop-off near ${esc(d.delivery_address.name)}</div>
+    <div class="drop-grid"><div class="drops">${d.options.map(opt).join("")}</div><div id="retmap" class="retmap"></div></div>
+    <div id="retlabel"></div>
+    <div class="mk-note">Locations from OpenStreetMap; in production they come from the carriers' location APIs. Labels and scans are simulated.</div></div>`;
+  document.querySelectorAll(".drop input").forEach(r => r.onchange = () => pickDrop(r.value));
+  mountReturnMap(d);
+}
+function mountReturnMap(d) {
+  const el = $("retmap"); if (!el || !window.L) { if (el) el.hidden = true; return; }
+  if (retMap) retMap.remove();
+  retMap = L.map(el, { zoomControl: false, scrollWheelZoom: false, attributionControl: true });
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, className: "gray-tiles",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(retMap);
+  const home = [d.delivery_address.lat, d.delivery_address.lng];
+  L.circleMarker(home, { radius: 7, color: "#fff", weight: 2, fillColor: "#1d1d1f", fillOpacity: 1 }).addTo(retMap)
+    .bindTooltip("You · " + d.delivery_address.name, { permanent: false });
+  retPins = {};
+  d.options.forEach(o => { retPins[o.id] = L.circleMarker([o.lat, o.lng], { radius: 7, color: "#fff", weight: 2,
+    fillColor: o.carrier === "UPS" ? "#8f611c" : "#0071e3", fillOpacity: 1 }).addTo(retMap).bindTooltip(o.name);
+    retPins[o.id].on("click", () => { const r = document.querySelector(`.drop input[value="${o.id}"]`); if (r) { r.checked = true; pickDrop(o.id); } }); });
+  retMap.fitBounds(L.latLngBounds([home, ...d.options.map(o => [o.lat, o.lng])]), { padding: [24, 24] });
+}
+async function pickDrop(id) {
+  document.querySelectorAll(".drop").forEach(x => x.classList.toggle("sel", x.dataset.id === id));
+  Object.entries(retPins).forEach(([k, m]) => { m.setRadius(k === id ? 11 : 7); if (k === id) m.openTooltip(); });
+  $("retlabel").innerHTML = `<div class="k"><span class="spin"></span>Issuing your label…</div>`;
+  const r = await fetch(`/api/deals/${deal.id}/return/dropoff`, { method: "POST", headers: { "Content-Type": "application/json" },
+                                                                  body: JSON.stringify({ location_id: id }) });
+  if (!r.ok) $("retlabel").innerHTML = `<div class="k">Couldn't issue the label.</div>`;
+}
+function renderLabel(info) {
+  const box = $("retlabel"); if (!box) return;
+  let qr = "";
+  try { const q = qrcode(0, "M"); q.addData(info.qr); q.make(); qr = q.createSvgTag({ cellSize: 3, margin: 2, scalable: true }); } catch { qr = ""; }
+  box.innerHTML = `<div class="label-card"><div class="qr">${qr || '<div class="noqr">QR</div>'}</div>
+    <div class="label-info"><div class="k">${esc(info.carrier)} return label · simulated</div>
+      <div class="lbl-track">${esc(info.tracking)}</div>
+      <div class="sub">Show this at ${esc(info.location.name)} · ${esc(info.location.address)}</div>
+      <div class="drop-links"><a href="${esc(info.location.links.apple)}" target="_blank" rel="noopener noreferrer">Directions in Apple Maps ↗</a>
+        <a href="${esc(info.location.links.google)}" target="_blank" rel="noopener noreferrer">Google Maps ↗</a></div>
+      <button class="start small" id="droppedBtn">I've dropped it off</button></div></div>
+    <ol class="steps ret-track" id="retTrack"></ol>`;
+  $("droppedBtn").onclick = async () => {
+    $("droppedBtn").disabled = true; $("droppedBtn").textContent = "Waiting for the carrier scan…";
+    await fetch(`/api/deals/${deal.id}/return/dropped`, { method: "POST" });
+  };
+}
+const RET_STAGES = ["dropped_off", "credit_issued", "in_transit", "received"];
+let retTracking = {};
+function onReturnTracking(e) {
+  retTracking[e.stage] = e;
+  const el = $("retTrack"); if (!el) return;
+  const reached = RET_STAGES.filter(k => retTracking[k]).length;
+  el.innerHTML = RET_STAGES.map((k, i) => `<li class="${i < reached - 1 ? "done" : i === reached - 1 ? "now" : ""}"><b>${esc(retTracking[k]?.label || {dropped_off: "Dropped off", credit_issued: "Credit issued", in_transit: "In transit", received: "Received"}[k])}</b>
+    <small>${retTracking[k] ? esc(retTracking[k].note) : ""}</small></li>`).join("");
+  if (e.stage === "credit_issued") pushStep("CREDIT ISSUED", "at first carrier scan", "final");
+  if (e.stage === "received" && $("droppedBtn")) $("droppedBtn").textContent = "Return complete";
+}
 function onReturn(e) {
   const box = $("ret"); if (!box) return;
   const t = e.terms, credit = t ? money(t.amount + (t.goodwill_credit || 0)) : "";
@@ -845,11 +942,8 @@ function onReturn(e) {
       await fetch(`/api/deals/${deal.id}/return/approve`, { method: "POST" });
     };
   }
-  if (e.phase === "resolved") {
-    box.innerHTML = `<div class="retcard ok"><div class="k">Return resolved · simulated</div>
-      <div class="retwhat">${esc(e.summary)}</div><div class="sub">Approved by ${e.approved_by === "human" ? "you" : "policy"} · posted to the BAND deal room</div></div>`;
-    pushStep("RETURN RESOLVED", what.toLowerCase(), "final");
-  }
+  if (e.phase === "resolved") { renderReturnDetails(e.details, e.approved_by); pushStep("RETURN APPROVED", what.toLowerCase(), "final"); }
+  if (e.phase === "label") renderLabel(e.label_info);
   if (e.phase === "rejected") box.innerHTML = `<div class="retcard"><div class="k">Return escalated to the store</div><div class="sub">${esc(e.authority?.reason || "")}</div></div>`;
 }
 function onQuotes(e) {

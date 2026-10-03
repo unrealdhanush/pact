@@ -25,8 +25,8 @@
       }
     ],
     "source": "tavily",
-    "checked_at": "2026-10-03T22:23:07+00:00",
-    "ms": 6410
+    "checked_at": "2026-10-03T22:46:52+00:00",
+    "ms": 421
   },
   "sennheiser-m4": {
     "product": "Sennheiser Momentum 4",
@@ -64,19 +64,12 @@
         "retailer": "Bose",
         "domain": "bose.com",
         "price": 449.0,
-        "title": "Shop Bose QuietComfort Ultra Headphones (2nd Gen) | Bose",
-        "url": "https://www.bose.com/p/headphones/bose-quietcomfort-ultra-headphones-2nd-gen/QCUH2-HEADPHONEARN.html"
-      },
-      {
-        "retailer": "Best Buy",
-        "domain": "bestbuy.com",
-        "price": 449.0,
-        "title": "Bose - QuietComfort Ultra Headphones (2nd Gen) - White",
-        "url": "https://www.bestbuy.com/product/bose-quietcomfort-ultra-headphones-2nd-gen-white/J7C5V6W7GS/sku/12936198/reviews"
+        "title": "Shop Bose QuietComfort Ultra Headphones (2nd Gen)\n        | Bose",
+        "url": "https://www.bose.com/p/fabfitfun/bose-quietcomfort-ultra-headphones-2nd-gen/QCUH2-HEADPHONEARN-DWSD-WW.html?bvrrp=qaenabled-en_US%2Freviews%2Fproduct%2F2%2FQCUH2-HEADPHONEARN.htm"
       }
     ],
     "source": "tavily",
-    "checked_at": "2026-10-03T21:13:46+00:00",
-    "ms": 2791
+    "checked_at": "2026-10-03T22:37:37+00:00",
+    "ms": 7164
   }
 }

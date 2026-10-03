@@ -216,6 +216,24 @@ async def approve_return(deal_id: str):
         raise HTTPException(409, str(e))
 
 
+@app.post("/api/deals/{deal_id}/return/dropoff")
+async def return_dropoff(deal_id: str, body: dict):
+    """The human picks a drop-off location; returns the carrier label (simulated)."""
+    try:
+        return _get(deal_id).choose_dropoff(str(body.get("location_id", "")))
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.post("/api/deals/{deal_id}/return/dropped")
+async def return_dropped(deal_id: str):
+    try:
+        _get(deal_id).mark_dropped()
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return {"ok": True}
+
+
 async def _remember_return(deal) -> None:
     rs, t = deal.return_state, deal.return_state["terms"]
     note = (f"Returned the {deal.product.name} ({rs['reason']}). Took "

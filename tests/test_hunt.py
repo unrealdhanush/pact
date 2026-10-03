@@ -112,5 +112,18 @@ async def test_return_flow_negotiates_store_credit_and_needs_the_human():
     assert rs["terms"]["goodwill_credit"] == 30 and rs["authority"]["decision"] == "HUMAN_APPROVAL_REQUIRED"
     out = h.approve_return()
     assert out["simulated"] and h.winner.return_state["status"] == "resolved"
+    opts = out["details"]["options"]
+    assert opts[0]["name"] == "Presidio Post Office" and "maps.apple.com" in opts[0]["links"]["apple"]
+    with pytest.raises(ValueError):
+        h.mark_dropped()  # must choose a drop-off first
+    ups = h.choose_dropoff("ups-marina")
+    assert ups["carrier"] == "UPS" and ups["tracking"].startswith("1Z")
+    h.mark_dropped()
+    for _ in range(200):
+        if h.winner.return_state["status"] == "closed":
+            break
+        await asyncio.sleep(0.01)
+    stages = [e["stage"] for e in h.events if e["type"] == "return_tracking"]
+    assert stages == ["dropped_off", "credit_issued", "in_transit", "received"]
     with pytest.raises(ValueError):
         await h.start_return("again")

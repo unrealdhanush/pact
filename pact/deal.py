@@ -1,5 +1,6 @@
 """One negotiation: room + both agents + authority gate + an event log the UI streams."""
 import asyncio
+from datetime import date, timedelta
 import dataclasses
 import logging
 import os
@@ -343,19 +344,67 @@ class Deal:
         if not rs or rs["status"] not in ("awaiting_approval", "checking_authority"):
             raise ValueError("No resolution is waiting for approval")
         t = rs["terms"]
+        from . import returns
         label = f"RMA-{abs(hash(self.execution['order_id'])) % 10**6:06d}"
-        rs.update(status="resolved", approved_by=by, label=label)
+        rs.update(status="resolved", approved_by=by, label=label,
+                  details=returns.details(self.execution["order_id"], label, t, self.product.name,
+                                          self.merchant_info["name"]))
         what = (f"Refund of {money(t['amount'])}" if t["resolution"] == "refund" else
                 f"{money(t['amount'] + t['goodwill_credit'])} store credit")
         self.emit("return", phase="resolved", terms=t, label=label, approved_by=by, simulated=True,
-                  summary=f"{what} · prepaid return label {label} · drop off within 14 days")
+                  details=rs["details"], summary=f"{what} · return {label} · drop off by {rs['details']['drop_by']}")
         if self.room is not None:
             self._spawn(self.room.post_event(f"Return approved by {'the shopper' if by == 'human' else 'policy'}: "
-                                             f"{what}. Return label {label} (simulated).", "task",
+                                             f"{what}. Return {label} (simulated).", "task",
                                              {"order_id": self.execution["order_id"], "rma": label, "simulated": True}))
-        if getattr(self, "on_return", None):
-            self._spawn(self.on_return(self))
-        return {"label": label, "resolution": t, "simulated": True}
+        return {"label": label, "resolution": t, "details": rs["details"], "simulated": True}
+
+    def choose_dropoff(self, location_id: str) -> dict:
+        """The human picks where to drop it off; the label is issued for that carrier."""
+        from . import returns
+        rs = getattr(self, "return_state", None) or {}
+        if rs.get("status") not in ("resolved", "label_ready"):
+            raise ValueError("The return isn't approved yet")
+        loc = next((o for o in rs["details"]["options"] if o["id"] == location_id), None)
+        if loc is None:
+            raise ValueError("Unknown drop-off location")
+        rs.update(status="label_ready", label_info=returns.label_for(rs["label"], loc))
+        self.emit("return", phase="label", label_info=rs["label_info"])
+        return rs["label_info"]
+
+    def mark_dropped(self) -> None:
+        rs = getattr(self, "return_state", None) or {}
+        if rs.get("status") != "label_ready":
+            raise ValueError("Choose a drop-off location first")
+        rs["status"] = "in_return_transit"
+        self._spawn(self._track_return())
+
+    async def _track_return(self) -> None:
+        """Simulated carrier scans → credit at first scan → in transit → received by the store."""
+        from . import returns
+        rs, info = self.return_state, self.return_state["label_info"]
+        step = float(os.environ.get("PACT_TRACKING_STEP_S", "6")) * 0.6
+        today = date.today()
+        notes = {"dropped_off": f"Scanned at {info['location']['name']} ({info['carrier']})",
+                 "credit_issued": rs["details"]["you_get"] + " — available now",
+                 "in_transit": f"{info['carrier']} {info['tracking']} on its way to {self.merchant_info['name']}",
+                 "received": f"{self.merchant_info['name']} received the return · inspection passed"}
+        dates = {"dropped_off": today, "credit_issued": today, "in_transit": today + timedelta(days=1),
+                 "received": today + timedelta(days=3)}
+        for i, stage in enumerate(returns.RETURN_STAGES[1:], start=1):
+            await asyncio.sleep(step)
+            self.emit("return_tracking", stage=stage, index=i, total=len(returns.RETURN_STAGES),
+                      label=returns.STAGE_LABEL[stage], note=notes[stage], date=dates[stage].isoformat(), simulated=True)
+            if self.room is not None:
+                try:
+                    await self.room.post_event(f"Return {rs['label']}: {returns.STAGE_LABEL[stage]} — {notes[stage]}",
+                                               "task", {"rma": rs["label"], "stage": stage, "simulated": True},
+                                               sender="MerchantAgent")
+                except Exception as e:  # noqa: BLE001
+                    log.warning("return tracking event failed: %s", e)
+            if stage == "credit_issued" and getattr(self, "on_return", None):
+                self._spawn(self.on_return(self))
+        rs["status"] = "closed"
 
     async def _track(self, order_id: str) -> None:
         """Post-purchase tracking (simulated carrier, sped-up demo clock). The merchant agent posts each
