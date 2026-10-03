@@ -27,14 +27,11 @@ CHILD_WINNER = {"phase", "authority", "status"}  # forwarded only from the winni
 NEGOTIATION_TIMEOUT_S = 90
 
 
-def rank_key(preference: str, shopper: ShopperState, deal: Deal):
-    t = deal.agreement.terms
-    off_colour = t.variant != shopper.preferred_variant
-    if preference == "cheapest":
-        return (t.price, t.delivery_date, off_colour)
-    if preference == "fastest":
-        return (t.delivery_date, t.price, off_colour)
-    return (off_colour, t.price, t.delivery_date, -t.return_window_days)  # best match
+def fit(preference: str, shopper: ShopperState, deal: Deal) -> tuple[float, dict]:
+    """Effective cost of a deal's agreement to this human (lower is better): price adjusted for
+    colour, delivery speed and return window, weighted by their preset and priorities."""
+    from . import engine
+    return engine.offer_fit(shopper, deal.agreement.terms, engine.weights(preference, shopper.priorities))
 
 
 class Hunt:
@@ -215,12 +212,14 @@ class Hunt:
     def _decide(self) -> None:
         agreed = [d for d in self.deals.values() if d.agreement and d.status != "failed"]
         self.quotes = []
+        scored = {d.merchant_id: fit(self.preference, self.shopper_state, d) for d in agreed}
         for m, d in self.deals.items():
             q = {"merchant": m, "name": d.merchant_info["name"]}
             if d in agreed:
                 t = d.agreement.terms
                 q.update(price=t.price, variant=t.variant, shipping=t.shipping,
-                         delivery_date=t.delivery_date.isoformat(), return_window_days=t.return_window_days)
+                         delivery_date=t.delivery_date.isoformat(), return_window_days=t.return_window_days,
+                         fit=scored[m][1])
             else:
                 q.update(failed=d.failure or "no agreement in time")
             self.quotes.append(q)
@@ -248,15 +247,21 @@ class Hunt:
             self.emit("phase", phase="failed")
             self.emit("status", status="failed", reason=self.failure)
             return
-        ranked = sorted(agreed, key=lambda d: rank_key(self.preference, self.shopper_state, d))
+        from . import engine
+        ranked = sorted(agreed, key=lambda d: scored[d.merchant_id][0])
         self.winner = win = ranked[0]
         self.room = win.room
-        label = {"best": "best match for your preferences", "cheapest": "cheapest", "fastest": "fastest delivery"}
+        label = {"best": "best overall fit", "cheapest": "cheapest", "fastest": "fastest delivery"}
         t = win.agreement.terms
-        self.emit("quotes", quotes=self.quotes, winner=win.merchant_id, preference=self.preference)
+        why = (engine.explain_choice(self.shopper_state, t, scored[win.merchant_id][1], ranked[1].agreement.terms,
+                                     scored[ranked[1].merchant_id][1]) if len(ranked) > 1 else "the only agreement")
+        prio = ", ".join(self.shopper_state.priorities) or "none emphasized"
+        self.emit("quotes", quotes=self.quotes, winner=win.merchant_id, preference=self.preference,
+                  priorities=self.shopper_state.priorities, why=why)
         self.emit("trace", side="shopper", kind="think",
-                  text=f"Compared {len(agreed)} agreement(s) by {label[self.preference]} → "
-                       f"{win.merchant_info['name']}: {money(t.price)} {t.variant}, arrives {t.delivery_date:%a %b %-d}")
+                  text=f"Compared {len(agreed)} agreement(s) by {label[self.preference]} (priorities: {prio}) → "
+                       f"{win.merchant_info['name']}: {money(t.price)} {t.variant}, arrives {t.delivery_date:%a %b %-d} — {why}")
+        win.shopper.reasons.append(f"Your agent chose {win.merchant_info['name']} because: {why}")
         for d in self.deals.values():
             if d is win:
                 continue

@@ -130,7 +130,7 @@ async def _remember_outcome(deal) -> None:
 
 @app.post("/api/deals")
 async def create_deal(pace: float = 1.2, id: str | None = None, intake: str | None = None,
-                      shop: int = 1, prefer: str = "best"):
+                      shop: int = 1, prefer: str = "best", prio: str | None = None):
     """shop=1: the shopper negotiates with every merchant in parallel and keeps the best by `prefer`
     (best | cheapest | fastest). shop=0: a single merchant (Aria Audio)."""
     if id is not None and not DEAL_ID.match(id):
@@ -141,6 +141,10 @@ async def create_deal(pace: float = 1.2, id: str | None = None, intake: str | No
         if it is None or not it.product or not it.product.get("carried"):
             raise HTTPException(409, "intake is not ready: no product this merchant carries")
         shopper_state, on_complete, product_id = it.shopper_state(), _remember_outcome, it.product["product_id"]
+    if prio is not None:  # the human's explicit "what matters most" overrides memory
+        from .scenario import ShopperState as _SS
+        shopper_state = shopper_state or _SS()
+        shopper_state.priorities = [p for p in prio.split(",") if p in ("price", "colour", "speed", "returns")]
     deal = await store.create(pace=pace, deal_id=id, shopper_state=shopper_state, on_complete=on_complete,
                               product_id=product_id, shop_around=bool(shop), preference=prefer)
     return {**deal.snapshot(), "integrations": integrations(),

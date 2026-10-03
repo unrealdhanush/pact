@@ -3,18 +3,18 @@
     "product": "Sony WH-1000XM5",
     "listings": [
       {
+        "retailer": "Best Buy",
+        "domain": "bestbuy.com",
+        "price": 298.0,
+        "title": "WH-1000XM5 Wireless Noise Cancelling Over-the-Ear ...",
+        "url": "https://www.bestbuy.com/product/sony-wh-1000xm5-wireless-noise-cancelling-over-the-ear-headphones-black/J7XSRH5CXG/sku/6505727"
+      },
+      {
         "retailer": "Sony",
         "domain": "sony.com",
         "price": 299.99,
         "title": "Sony WH-1000XM5 Premium Wireless Noise Canceling Headphones | Silver | Sony Electronics",
         "url": "https://electronics.sony.com/audio/headphones/headband/p/wh1000xm5-s"
-      },
-      {
-        "retailer": "Best Buy",
-        "domain": "bestbuy.com",
-        "price": 299.99,
-        "title": "Sony - WH-1000XM5 Wireless Noise Cancelling Over-the- ...",
-        "url": "https://www.bestbuy.com/product/sony-wh-1000xm5-wireless-noise-cancelling-over-the-ear-headphones-black/J7XSRH5CXG"
       },
       {
         "retailer": "Walmart",
@@ -25,8 +25,8 @@
       }
     ],
     "source": "tavily",
-    "checked_at": "2026-10-03T21:30:21+00:00",
-    "ms": 383
+    "checked_at": "2026-10-03T21:44:19+00:00",
+    "ms": 6067
   },
   "sennheiser-m4": {
     "product": "Sennheiser Momentum 4",

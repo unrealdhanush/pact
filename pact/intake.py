@@ -196,6 +196,9 @@ class Intake:
         for h in hits:
             if h.kind == "history" and not any(r["id"] == h.id for r in self.recalled):
                 self.recalled.append({**h.as_dict(), "ms": round(ms, 1)})
+            # a past return because of comfort means the return window matters to this human
+            if h.id == "history-bose" and "priorities" not in self.fields:
+                self.fields["priorities"] = Boundary(["returns"], "memory", h.id, h.text)
         if recalled_ms:
             self.timings["recall_ms"] = round(sum(recalled_ms) / len(recalled_ms), 1)
 

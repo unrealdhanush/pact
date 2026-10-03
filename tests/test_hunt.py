@@ -13,13 +13,16 @@ async def settle(h, until=("awaiting_approval", "complete", "failed")):
     raise AssertionError(f"hunt stuck in {h.status}")
 
 
-@pytest.mark.parametrize("preference,winner,variant", [
-    ("best", "soundhub", "black"),      # preferred colour wins
-    ("fastest", "aria", "silver"),      # next-day beats 3-day standard
-    ("cheapest", "aria", "silver"),     # same price; tie broken by speed
+@pytest.mark.parametrize("preference,priorities,winner,variant", [
+    # silver is an accepted fallback with 45-day returns, and Aria is 2 days faster with 15 more return days
+    ("best", [], "aria", "silver"),
+    ("best", ["colour"], "soundhub", "black"),   # the human cares most about getting black
+    ("fastest", [], "aria", "silver"),           # next-day beats 3-day standard
+    ("cheapest", [], "soundhub", "black"),       # same price; preferred colour breaks the tie
 ])
-async def test_shopper_compares_merchants_by_preference(preference, winner, variant):
-    h = Hunt(pace=0, preference=preference)
+async def test_shopper_compares_merchants_by_what_the_human_values(preference, priorities, winner, variant):
+    from pact.scenario import ShopperState
+    h = Hunt(pace=0, preference=preference, shopper_state=ShopperState(priorities=priorities))
     await h.setup()
     await h.run()
     await settle(h)

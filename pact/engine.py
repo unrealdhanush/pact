@@ -235,3 +235,61 @@ def near_miss(s: ShopperState, c: Counteroffer) -> dict | None:
     o = min(cands, key=lambda x: (x.price, x.variant != s.preferred_variant))
     over = round(o.price - s.max_price, 2)
     return {"offer": o, "over_by": over, "over_pct": round(over / s.max_price * 100, 1), "budget": s.max_price}
+
+
+# ---------------------------------------------------------------- comparing offers by what the human values
+PRIORITIES = ("price", "colour", "speed", "returns")
+PRESETS = {  # "shop around for" presets; selected priorities multiply on top
+    "best": {"price": 1.0, "colour": 1.0, "speed": 1.0, "returns": 1.0},
+    "cheapest": {"price": 1.0, "colour": 0.5, "speed": 0.1, "returns": 0.1},
+    "fastest": {"price": 1.0, "colour": 1.0, "speed": 5.0, "returns": 0.5},
+}
+EMPHASIS = 3.0  # a priority the human marked as important
+
+
+def weights(preference: str, priorities: list[str] | None) -> dict[str, float]:
+    w = dict(PRESETS.get(preference, PRESETS["best"]))
+    for p in priorities or []:
+        if p in w and p != "price":
+            w[p] *= EMPHASIS
+        elif p == "price":  # price matters more = everything else matters less
+            for k in ("colour", "speed", "returns"):
+                w[k] /= EMPHASIS
+    return w
+
+
+def offer_fit(s: ShopperState, t: Offer, w: dict[str, float], today: date | None = None) -> tuple[float, dict]:
+    """Effective cost of an offer to this human, in dollars (lower is better), with a breakdown."""
+    today = today or date.today()
+    if t.variant == s.preferred_variant:
+        colour = 0.0
+    elif t.variant in s.fallback_variants:
+        condition_met = t.return_window_days >= s.fallback_return_days
+        colour = (8.0 if condition_met else 25.0) * w["colour"]
+    else:
+        colour = 1000.0
+    days = max(0, (t.delivery_date - today).days)
+    speed = 6.0 * w["speed"] * days
+    returns = 0.6 * w["returns"] * max(0, t.return_window_days - s.minimum_return_days)
+    score = t.price + colour + speed - returns
+    return round(score, 2), {"price": t.price, "colour": round(colour, 2), "delivery_days": days,
+                             "speed": round(speed, 2), "returns": round(returns, 2), "score": round(score, 2)}
+
+
+def explain_choice(s: ShopperState, win: Offer, wb: dict, other: Offer, ob: dict) -> str:
+    """One sentence on why `win` beat `other`, in the human's terms."""
+    bits = []
+    if win.variant != other.variant:
+        if win.variant == s.preferred_variant:
+            bits.append(f"it's your preferred {win.variant}")
+        elif win.variant in s.fallback_variants and win.return_window_days >= s.fallback_return_days:
+            bits.append(f"{win.variant} instead of {other.variant} (you said {win.variant} is fine with "
+                        f"{s.fallback_return_days}-day returns)")
+    if wb["delivery_days"] < ob["delivery_days"]:
+        d = ob["delivery_days"] - wb["delivery_days"]
+        bits.append(f"arrives {d} day{'s' if d > 1 else ''} sooner")
+    if win.return_window_days > other.return_window_days:
+        bits.append(f"{win.return_window_days - other.return_window_days} more days to return it")
+    if win.price < other.price:
+        bits.append(f"{money(other.price - win.price)} cheaper")
+    return "; ".join(bits) or "best overall fit"

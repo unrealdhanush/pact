@@ -524,6 +524,7 @@ function onAuthority(e) {
 }
 
 function onStatus(e) {
+  if (e.agreement?.list_price) listPrice = e.agreement.list_price;  // the winning merchant's shelf price
   deal.status = e.status;
   setBoundaryLock();
   if (["awaiting_approval", "complete", "failed"].includes(e.status)) progress(3);
@@ -614,7 +615,8 @@ async function start(intakeId = null) {
   ["room", "shopperTrace", "merchantTrace"].forEach(id => $(id).innerHTML = "");
   $("stage").innerHTML = `<div class="k"><span class="spin"></span>Opening deal room…</div>`;
   const res = await request(`/api/deals?pace=${pace}&id=${encodeURIComponent(dealParam)}` +
-                          (intakeId ? `&intake=${intakeId}` : "") + `&prefer=${prefer}`, { method: "POST" });
+                          (intakeId ? `&intake=${intakeId}` : "") + `&prefer=${prefer}` +
+                          (intakeId && priorities !== null ? `&prio=${priorities.join(",")}` : ""), { method: "POST" });
   deal = await res.json();
   listPrice = deal.product.list_price;
   renderChips(deal.integrations, deal.room);
@@ -682,8 +684,9 @@ function renderIntake(v, showOptions = true) {
   else if (v.product && $("productLine")) $("productLine").textContent = `${v.product.name}${v.product.carried ? " · list " + money(v.product.list_price) : " — not sold by reachable merchants"}`;
 
 }
-const PREF_LABEL = { best: "Best match", cheapest: "Cheapest", fastest: "Fastest delivery" };
-let prefer = "best", sortBy = "relevance";
+const PREF_LABEL = { best: "Best overall", cheapest: "Cheapest", fastest: "Fastest delivery" };
+let prefer = "best", sortBy = "relevance", priorities = null;  // null = not touched yet (use memory)
+const PRIO_LABEL = { colour: "Colour", price: "Price", speed: "Delivery", returns: "Returns" };
 function showException(x) {
   const o = x.offer, d = x.decision || {};
   pushStep("OVER BUDGET", `+${money(x.over_by)} · Jev: ask you`, "jev");
@@ -755,13 +758,16 @@ function onQuotes(e) {
   const rows = e.quotes.map(q => q.failed
     ? `<tr><td>${esc(q.name)}</td><td colspan="3">no deal · ${esc(q.failed)}</td></tr>`
     : `<tr class="${q.merchant === e.winner ? "win" : ""}"><td>${q.merchant === e.winner ? "▸ " : ""}${esc(q.name)}</td><td>${money(q.price)} ${esc(q.variant)}</td>
-         <td>${q.shipping === "free_next_day" ? "next-day" : "standard"} · ${day(q.delivery_date)}</td><td>${q.return_window_days}-day returns</td></tr>`).join("");
+         <td>${q.shipping === "free_next_day" ? "next-day" : "standard"} · ${day(q.delivery_date)}</td><td>${q.return_window_days}-day returns</td>
+         <td title="Price adjusted for colour, delivery and returns by your priorities">${q.fit ? "fit " + money(q.fit.score) : ""}</td></tr>`).join("");
   const win = e.quotes.find(q => q.merchant === e.winner);
   $("room").insertAdjacentHTML("beforeend", `<div class="msg system">Shopper compared ${e.quotes.length} merchants by
-    <b>${PREF_LABEL[e.preference] || e.preference}</b>${win ? ` → <b>${esc(win.name)}</b>` : " → none fit"}<table class="quotes">${rows}</table></div>`);
+    <b>${PREF_LABEL[e.preference] || e.preference}</b>${e.priorities?.length ? ` · priorities: ${e.priorities.map(p => PRIO_LABEL[p]).join(", ")}` : ""}${win ? ` → <b>${esc(win.name)}</b>` : " → none fit"}
+    ${e.why && win ? `<div style="margin-top:4px">Why: ${esc(e.why)}.</div>` : ""}<table class="quotes">${rows}</table></div>`);
   $("room").scrollTop = $("room").scrollHeight;
   if (win) pushStep(`BEST: ${win.name}`, PREF_LABEL[e.preference].toLowerCase(), "final");
 }
+function activePrio(v) { return priorities ?? (v?.fields?.priorities?.value || []); }
 function renderOptions(v) {
   if (deal && deal.status !== "complete" && deal.status !== "failed" && source) return;  // a deal is running
   const f = v.fields, sel = v.product?.product_id;
@@ -770,7 +776,10 @@ function renderOptions(v) {
   const chip = (group, val, label, cur) => `<button class="chip2 ${val === cur ? "on" : ""}" data-${group}="${val}">${label}</button>`;
   const controls = `<div class="chips2"><span class="lbl">Sort</span>${chip("sort", "relevance", "Relevance", sortBy)}
       ${chip("sort", "low", "Price: low → high", sortBy)}${chip("sort", "high", "Price: high → low", sortBy)}</div>
-    <div class="chips2"><span class="lbl">Shop around for</span>${Object.entries(PREF_LABEL).map(([k, l]) => chip("pref", k, l, prefer)).join("")}</div>`;
+    <div class="chips2"><span class="lbl">Shop around for</span>${Object.entries(PREF_LABEL).map(([k, l]) => chip("pref", k, l, prefer)).join("")}</div>
+    <div class="chips2"><span class="lbl">What matters most</span>${Object.entries(PRIO_LABEL).map(([k, l]) =>
+      `<button class="chip2 ${activePrio(v).includes(k) ? "on" : ""}" data-prio="${k}">${l}${
+        priorities === null && f.priorities?.source === "memory" && f.priorities.value.includes(k) ? ' <span class="src memory">MEMORY</span>' : ""}</button>`).join("")}</div>`;
   const cards = order.map(o => {
     const ref = o.carried && f.competitor_price && f.competitor_product_id?.value === o.product_id
       ? `<div class="ref">Seen at ${esc(f.competitor_retailer.value)}: ${money(f.competitor_price.value)}</div>` : "";
@@ -801,6 +810,11 @@ function renderOptions(v) {
   loadMarket(sel);
   document.querySelectorAll("[data-sort]").forEach(b => b.onclick = () => { sortBy = b.dataset.sort; renderOptions(intake); });
   document.querySelectorAll("[data-pref]").forEach(b => b.onclick = () => { prefer = b.dataset.pref; renderOptions(intake); });
+  document.querySelectorAll("[data-prio]").forEach(b => b.onclick = () => {
+    const cur = activePrio(intake), k = b.dataset.prio;
+    priorities = cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k];
+    renderOptions(intake);
+  });
 }
 function onMarket(m) {
   if (!m.listings?.length) return;
