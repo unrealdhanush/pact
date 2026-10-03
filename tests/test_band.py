@@ -28,6 +28,8 @@ class FakeBand:
             return {"data": {"id": i, "name": name, "handle": handle}}
         if path == "/agent/chats":
             return {"data": {"id": "chat-42", "title": body["chat"]["title"]}}
+        if path == "/me/chats":
+            return {"data": {"id": "chat-42", "title": body["chat"]["title"], "type": "group"}}
         if path.endswith("/participants"):
             return {"data": {"id": body["participant"]["participant_id"], "role": "member"}}
         if path.endswith("/messages"):
@@ -219,3 +221,16 @@ async def test_shared_agent_socket_joins_and_routes_by_topic():
     assert sock.ws.sent[-1][3] == "phx_leave"
     for t in list(sock._tasks):
         t.cancel()
+
+
+async def test_human_key_creates_human_owned_room_with_both_agents():
+    fake = FakeBand()
+    cfg = BandConfig(shopper_key="skey", merchant_key="mkey", ws_timeout=0.05, human_key="hkey")
+    room = await BandRoom.create("deal-1842", cfg, request=fake, connect_ws=False)
+    create = next(c for c in fake.calls if c[1] == "/me/chats")
+    assert create[2] == "hkey" and create[3] == {"chat": {"title": "#DEAL-1842"}}
+    adds = [c for c in fake.calls if c[1] == "/me/chats/chat-42/participants"]
+    assert [c[3]["participant"]["participant_id"] for c in adds] == ["sid-1", "mid-2"]
+    assert all(c[2] == "hkey" for c in adds)
+    assert not any(c[1] == "/agent/chats" for c in fake.calls)
+    assert room.status()["owner"] == "human"

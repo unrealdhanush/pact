@@ -46,6 +46,7 @@ class BandConfig:
     base_url: str = "https://app.band.ai/api/v1"
     ws_url: str = "wss://app.band.ai/api/v1/socket/websocket"
     ws_timeout: float = 6.0
+    human_key: str = ""  # optional; when set, deal rooms are created by (and visible to) the human account
 
     @classmethod
     def from_env(cls) -> "BandConfig | None":
@@ -57,6 +58,7 @@ class BandConfig:
             base_url=os.getenv("BAND_BASE_URL", cls.base_url).rstrip("/"),
             ws_url=os.getenv("BAND_WS_URL", cls.ws_url),
             ws_timeout=float(os.getenv("BAND_WS_TIMEOUT", cls.ws_timeout)),
+            human_key=human_key(),
         )
 
 
@@ -238,6 +240,7 @@ class BandRoom:
         self.history: list[RoomMessage] = []
         self.stats = {"posted": 0, "events": 0, "ws_delivered": 0, "local_delivered": 0, "ws_connected": 0}
         self.on_status: Callable[[dict], None] | None = None
+        self.owner = ""
         self.degraded = False
         self.last_error = ""
         self._request = request or urllib_request
@@ -266,12 +269,25 @@ class BandRoom:
             ident.band_name = me.get("name") or ""
             if not ident.id:
                 raise BandError(f"/agent/me for {name} returned no id")
-        chat = _data(await room._call("POST", "/agent/chats", "ShopperAgent", {"chat": {"title": room.title}}))
-        room.chat_id = str(chat.get("id", ""))
-        if not room.chat_id:
-            raise BandError("POST /agent/chats returned no room id")
-        await room._call("POST", f"/agent/chats/{room.chat_id}/participants", "ShopperAgent",
-                         {"participant": {"participant_id": room.identities["MerchantAgent"].id, "role": "member"}})
+        if config.human_key:
+            # Human-owned room (INTEGRATION.md): the owner can watch the deal live in the BAND app.
+            human = lambda method, path, body: room._request(method, f"{config.base_url}{path}", config.human_key, body)
+            chat = _data(await human("POST", "/me/chats", {"chat": {"title": room.title}}))
+            room.chat_id = str(chat.get("id", ""))
+            if not room.chat_id:
+                raise BandError("POST /me/chats returned no room id")
+            for ident in room.identities.values():
+                await human("POST", f"/me/chats/{room.chat_id}/participants",
+                            {"participant": {"participant_id": ident.id, "role": "member"}})
+            room.owner = "human"
+        else:
+            chat = _data(await room._call("POST", "/agent/chats", "ShopperAgent", {"chat": {"title": room.title}}))
+            room.chat_id = str(chat.get("id", ""))
+            if not room.chat_id:
+                raise BandError("POST /agent/chats returned no room id")
+            await room._call("POST", f"/agent/chats/{room.chat_id}/participants", "ShopperAgent",
+                             {"participant": {"participant_id": room.identities["MerchantAgent"].id, "role": "member"}})
+            room.owner = "ShopperAgent"
         room.transport_name = "BAND (live)"
         if connect_ws:
             await room._connect_sockets()
@@ -353,7 +369,7 @@ class BandRoom:
 
     def status(self) -> dict:
         return {"transport": self.transport_name, "chat_id": self.chat_id, "title": self.title,
-                "live": not self.degraded, "error": self.last_error, **self.stats}
+                "live": not self.degraded, "error": self.last_error, "owner": self.owner, **self.stats}
 
     # ------------------------------------------------------------ Room interface
     def subscribe(self, handler: Handler) -> None:
