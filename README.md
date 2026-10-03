@@ -47,12 +47,22 @@ room, sends an @mention and confirms delivery over the WebSocket.
 Optional overrides: `BAND_BASE_URL` (default `https://app.band.ai/api/v1`), `BAND_WS_URL`,
 `BAND_WS_TIMEOUT` (seconds before a message falls back to local delivery, default 6).
 
-What happens on BAND per deal: the shopper agent creates a room titled `#DEAL-1842`, adds the
-merchant agent, and every negotiation turn is a text message with a real @mention of the other
-agent (`POST /agent/chats/{id}/messages`) carrying the public protocol payload as a ```pact JSON
-block. Each agent listens on its own WebSocket (`chat_room:{id}` / `message_created`) and only acts
-on messages BAND delivers to it. The Jev decision and the human approval are posted as room events
-(`POST /agent/chats/{id}/events`). Private budgets, floors and inventory never enter the room.
+What happens on BAND per deal: with `BAND_HUMAN_API_KEY` set, the human account creates a room
+titled `#DEAL-1842` (`POST /me/chats`) and adds both agents, so the owner can watch it live in the
+BAND app (without the human key, ShopperAgent creates it). Every negotiation turn is a text message
+with a real @mention of the other agent (`POST /agent/chats/{id}/messages`) carrying the public
+protocol payload as a ```pact JSON block (see `INTEGRATION.md`). Each agent keeps one WebSocket
+(`chat_room:{id}` / `message_created`) shared across deals, only acts on messages BAND delivers to
+it, and marks them `processing` → `processed`. The Jev decision and the human approval are posted
+as room events (`POST /agent/chats/{id}/events`). Private budgets, floors and inventory never enter the room.
+
+BAND quirks handled: Cloudflare rejects Python's default User-Agent (error 1010); WebSocket connects
+are rate-limited (HTTP 429), hence one shared socket per agent with backoff; stored message content
+rewrites mentions to `@[[agent-uuid]]`.
+
+`.env.band` is per BAND account. Agents registered on one account can't join rooms owned by another,
+so each machine either copies the `.env.band` that matches its `BAND_HUMAN_API_KEY` or deletes it and
+lets Pact register a fresh pair (BAND free tier allows 20 agents).
 
 ### Jev setup (TypeSafe AI)
 
