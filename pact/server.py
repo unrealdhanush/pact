@@ -9,6 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
@@ -19,12 +20,13 @@ from .deal import DealStore, _jsonable  # noqa: E402
 from .engine import money  # noqa: E402
 from .intake import IntakeStore  # noqa: E402
 from .memory import memory  # noqa: E402
-from .scenario import MerchantState, Product, ShopperState  # noqa: E402
+from .scenario import MerchantState, Product, ShopperState, merchant_state, product  # noqa: E402
 
 WEB = ROOT / "web"
 DEAL_ID = re.compile(r"^deal-\d{4}$")
 
 app = FastAPI(title="Pact")
+app.mount("/assets", StaticFiles(directory=WEB / "assets"), name="assets")
 store = DealStore()
 intakes = IntakeStore()
 
@@ -59,9 +61,14 @@ def index():
 
 
 @app.get("/api/scenario")
-def scenario():
-    return {"product": asdict(Product()), "shopper": _jsonable(asdict(ShopperState())),
-            "merchant": _jsonable(asdict(MerchantState()))}
+def scenario(product_id: str = "sony-wh1000xm5"):
+    try:
+        selected = product(product_id)
+        merchant = merchant_state(product_id)
+    except KeyError:
+        raise HTTPException(422, "unknown demo product") from None
+    return {"product": asdict(selected), "shopper": _jsonable(asdict(ShopperState())),
+            "merchant": _jsonable(asdict(merchant))}
 
 
 @app.get("/api/integrations")
@@ -100,7 +107,8 @@ async def choose_product(intake_id: str, body: dict):
     if it is None:
         raise HTTPException(404, "unknown intake")
     try:
-        return await it.choose(str(body.get("product_id", "")), body.get("max_price"))
+        return await it.choose(str(body.get("product_id", "")), body.get("max_price"),
+                               body.get("approval_required_above"))
     except ValueError as e:
         raise HTTPException(409, str(e))
 

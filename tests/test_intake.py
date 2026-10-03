@@ -97,3 +97,58 @@ async def test_choosing_another_product_and_price():
     assert p.competitor_claim is None and p.requested_price <= 209.99 * 0.9
     with pytest.raises(ValueError):
         await it.choose("airpods-max")  # not sold by a reachable merchant
+
+
+async def test_editing_limits_reaches_the_authority_gate():
+    from pact.gate import local_decision
+    from pact.protocol import Agreement, Offer
+    from pact.scenario import MerchantState
+
+    it = Intake()
+    await it.turn("Sony headphones in black under 300 by Tuesday")
+    v = await it.choose("sony-wh1000xm5", max_price=350, approval_required_above=320)
+    assert not v["confirmed"]
+    assert v["fields"]["approval_required_above"]["source"] == "you"
+    shopper = it.shopper_state()
+    assert (shopper.max_price, shopper.approval_required_above) == (350, 320)
+    agreement = Agreement(transaction_id="limits-test", list_price=329.99, shopper_savings=30,
+                          human_approval_required=False,
+                          terms=Offer(price=299.99, variant="silver", shipping="free_next_day",
+                                      delivery_date=shopper.delivery_deadline, return_window_days=45))
+    assert local_decision(agreement, shopper, MerchantState())["decision"] == "AUTO_APPROVE"
+    await it.choose("sony-wh1000xm5", approval_required_above=250)
+    assert local_decision(agreement, it.shopper_state(), MerchantState())["decision"] == "HUMAN_APPROVAL_REQUIRED"
+    await it.choose("sony-wh1000xm5", max_price=290)
+    assert local_decision(agreement, it.shopper_state(), MerchantState())["decision"] == "REJECT"
+
+
+@pytest.mark.parametrize("bad", [-1, float("nan"), float("inf"), True, "not a number"])
+async def test_invalid_limit_edits_are_atomic(bad):
+    it = Intake()
+    await it.turn("Sony headphones in black under 300 by Tuesday")
+    before = it.shopper_state()
+    with pytest.raises(ValueError):
+        await it.choose("sennheiser-m4", max_price=350, approval_required_above=bad)
+    assert it.product["product_id"] == "sony-wh1000xm5"
+    assert it.shopper_state() == before
+
+
+async def test_limit_edit_api_and_product_assets(monkeypatch):
+    import httpx
+    from pact import server
+
+    it = Intake()
+    await it.turn("Sony headphones in black under 300 by Tuesday")
+    monkeypatch.setattr(server.intakes, "items", {it.id: it})
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url="http://pact.test") as client:
+        r = await client.post(f"/api/intake/{it.id}/choose", json={"product_id": "sony-wh1000xm5", "max_price": 350, "approval_required_above": 0})
+        assert r.status_code == 200
+        assert r.json()["fields"]["approval_required_above"]["value"] == 0
+        r = await client.post(f"/api/intake/{it.id}/choose", json={"product_id": "sony-wh1000xm5", "approval_required_above": -1})
+        assert r.status_code == 409
+        r = await client.get("/api/scenario?product_id=sennheiser-m4")
+        assert r.json()["merchant"]["inventory"] == {"black": 9, "white": 4}
+        assert (await client.get("/api/scenario?product_id=unknown")).status_code == 422
+        for name in ("sony-wh1000xm5", "bose-qc-ultra", "sennheiser-m4"):
+            r = await client.get(f"/assets/{name}.png")
+            assert r.status_code == 200 and r.headers["content-type"] == "image/png"
