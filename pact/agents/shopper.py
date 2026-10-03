@@ -87,7 +87,10 @@ class ShopperAgent(Agent):
             await self.room.post(self.name, f"@{MERCHANT} Can't confirm: {agreement.reason}",
                                  agreement, [MERCHANT])
             return
-        await self.room.post(self.name, f"@{MERCHANT} Confirmed on my side. Sending the agreement for "
-                                        f"authority check before anything executes.", agreement, [MERCHANT])
+        text = (f"@{MERCHANT} Confirmed on my side. I'm comparing offers from other merchants before "
+                f"anything executes." if getattr(self, "comparing", False) else
+                f"@{MERCHANT} Confirmed on my side. Sending the agreement for authority check before "
+                f"anything executes.")
+        await self.room.post(self.name, text, agreement, [MERCHANT])
         await self.pause(0.3)  # let the room message land before the authority gate
         self.on_agreement(agreement)

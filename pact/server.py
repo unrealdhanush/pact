@@ -106,7 +106,10 @@ async def _remember_outcome(deal) -> None:
 
 
 @app.post("/api/deals")
-async def create_deal(pace: float = 1.2, id: str | None = None, intake: str | None = None):
+async def create_deal(pace: float = 1.2, id: str | None = None, intake: str | None = None,
+                      shop: int = 1, prefer: str = "best"):
+    """shop=1: the shopper negotiates with every merchant in parallel and keeps the best by `prefer`
+    (best | cheapest | fastest). shop=0: a single merchant (Aria Audio)."""
     if id is not None and not DEAL_ID.match(id):
         raise HTTPException(422, "id must look like deal-1842")
     shopper_state, on_complete, product_id = None, None, "sony-wh1000xm5"
@@ -116,7 +119,7 @@ async def create_deal(pace: float = 1.2, id: str | None = None, intake: str | No
             raise HTTPException(409, "intake is not ready: no product this merchant carries")
         shopper_state, on_complete, product_id = it.shopper_state(), _remember_outcome, it.product["product_id"]
     deal = await store.create(pace=pace, deal_id=id, shopper_state=shopper_state, on_complete=on_complete,
-                              product_id=product_id)
+                              product_id=product_id, shop_around=bool(shop), preference=prefer)
     return {**deal.snapshot(), "integrations": integrations(),
             "intake": intakes.items[intake].view("")["fields"] if intake else None}
 

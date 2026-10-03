@@ -92,6 +92,14 @@
   .msg { max-width: 84%; padding: 10px 14px; border-radius: 14px; font-size: 15px; line-height: 1.4; animation: in .35s ease; }
   .msg .who { font: 600 11px var(--mono); letter-spacing: .05em; margin-bottom: 3px; display: flex; gap: 8px; }
   .msg .who .via { color: var(--muted); font-weight: 400; }
+  .msg .who .store { color: var(--text); font-weight: 600; opacity: .8; }
+  .quotes { width: 100%; border-collapse: collapse; margin-top: 6px; font: 12px var(--mono); }
+  .quotes td { padding: 3px 6px; border-top: 1px dashed #2a2f37; text-align: left; }
+  .quotes tr.win td { color: var(--ok, #68d391); font-weight: 700; }
+  .chips2 { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 2px 0 8px; }
+  .chip2 { font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); background: #12151a; color: var(--muted); cursor: pointer; }
+  .chip2.on { color: #0d0f12; background: var(--shopper); border-color: var(--shopper); font-weight: 600; }
+  .chips2 .lbl { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); align-self: center; margin-right: 4px; }
   .msg.ShopperAgent { align-self: flex-start; background: var(--shopper-dim); border: 1px solid rgba(79,209,197,.32); border-bottom-left-radius: 4px; }
   .msg.ShopperAgent .who b { color: var(--shopper); }
   .msg.MerchantAgent { align-self: flex-end; background: var(--merchant-dim); border: 1px solid rgba(246,173,85,.32); border-bottom-right-radius: 4px; }
@@ -382,22 +390,25 @@ function showBlocked(e) {
 }
 
 // ---- events -------------------------------------------------------------------
-function onMessage(m) {
+let askedOnce = false;
+function onMessage(m, store = null) {
   const text = esc(m.text).replace(/@(\w+Agent)/g, '<span class="mention">@$1</span>');
   const via = deal?.room?.live ? "via BAND" : "local";
+  const tag = store ? `<span class="store">${m.sender === "ShopperAgent" ? "→ " : ""}${esc(store)}</span>` : "";
   $("room").insertAdjacentHTML("beforeend",
-    `<div class="msg ${m.sender}"><div class="who"><b>@${m.sender}</b><span class="via">${via}</span></div>${text}</div>`);
+    `<div class="msg ${m.sender}"><div class="who"><b>@${m.sender}</b>${tag}<span class="via">${via}</span></div>${text}</div>`);
   $("room").scrollTop = $("room").scrollHeight;
   $("typing").textContent = "";
 
   const p = m.payload || {};
-  if (p.kind === "proposal") pushStep(money(p.requested_price), "shopper asks");
+  if (p.kind === "proposal" && !(store && askedOnce)) { askedOnce = true; pushStep(money(p.requested_price), store ? "shopper asks every store" : "shopper asks"); }
   if (p.kind === "counteroffer" && p.competitor_check) {
     const c = p.competitor_check, how = c.source === "cache" ? "cached" : c.source === "tavily" ? "live" : c.source;
     pushStep((c.verified ? "✓ " : "✗ ") + money(c.claimed_price), `${c.retailer} · Tavily ${how}`);
   }
   if (p.kind === "counteroffer") {
-    p.offers.forEach(o => pushStep(money(o.price) + (o.shipping === "free_next_day" ? " + free ship" : ""), o.variant));
+    p.offers.forEach(o => pushStep(money(o.price) + (o.shipping === "free_next_day" ? " + free ship" : ""),
+                                   store ? `${o.variant} · ${store}` : o.variant));
     showOffer(p.offers[p.offers.length - 1], "Current offer");
   }
   if (p.kind === "conditional_accept" && p.conditions.return_window_days)
@@ -443,11 +454,11 @@ function onStatus(e) {
 async function start(intakeId = null) {
   if (source) source.close();
   document.body.classList.remove("decision");
-  agreement = authority = null; why = []; steps = [];
+  agreement = authority = null; why = []; steps = []; askedOnce = false;
   ["room", "shopperTrace", "merchantTrace"].forEach(id => $(id).innerHTML = "");
   $("stage").innerHTML = `<div class="k"><span class="spin"></span>Opening deal room…</div>`;
   const res = await fetch(`/api/deals?pace=${pace}&id=${encodeURIComponent(dealParam)}` +
-                          (intakeId ? `&intake=${intakeId}` : ""), { method: "POST" });
+                          (intakeId ? `&intake=${intakeId}` : "") + `&prefer=${prefer}`, { method: "POST" });
   deal = await res.json();
   listPrice = deal.product.list_price;
   renderChips(deal.integrations, deal.room);
@@ -458,7 +469,8 @@ async function start(intakeId = null) {
   source = new EventSource(`/api/deals/${deal.id}/events`);
   source.onmessage = ev => {
     const e = JSON.parse(ev.data);
-    if (e.type === "message") onMessage(e.message);
+    if (e.type === "message") onMessage(e.message, e.merchant_name);
+    else if (e.type === "quotes") onQuotes(e);
     else if (e.type === "trace") onTrace(e);
     else if (e.type === "phase") onPhase(e);
     else if (e.type === "authority") onAuthority(e);
@@ -499,10 +511,29 @@ function renderIntake(v) {
   else if (v.product) $("productLine").textContent = `${v.product.name}${v.product.carried ? "" : " — not sold by reachable merchants"}`;
 
 }
+const PREF_LABEL = { best: "Best match", cheapest: "Cheapest", fastest: "Fastest delivery" };
+let prefer = "best", sortBy = "relevance";
+function onQuotes(e) {
+  const rows = e.quotes.map(q => q.failed
+    ? `<tr><td>${esc(q.name)}</td><td colspan="3">no deal · ${esc(q.failed)}</td></tr>`
+    : `<tr class="${q.merchant === e.winner ? "win" : ""}"><td>${q.merchant === e.winner ? "▸ " : ""}${esc(q.name)}</td><td>${money(q.price)} ${esc(q.variant)}</td>
+         <td>${q.shipping === "free_next_day" ? "next-day" : "standard"} · ${day(q.delivery_date)}</td><td>${q.return_window_days}-day returns</td></tr>`).join("");
+  const win = e.quotes.find(q => q.merchant === e.winner);
+  $("room").insertAdjacentHTML("beforeend", `<div class="msg system">Shopper compared ${e.quotes.length} merchants by
+    <b>${PREF_LABEL[e.preference] || e.preference}</b>${win ? ` → <b>${esc(win.name)}</b>` : " → none fit"}<table class="quotes">${rows}</table></div>`);
+  $("room").scrollTop = $("room").scrollHeight;
+  if (win) pushStep(`BEST: ${win.name}`, PREF_LABEL[e.preference].toLowerCase(), "final");
+}
 function renderOptions(v) {
   if (deal && deal.status !== "complete" && deal.status !== "failed" && source) return;  // a deal is running
   const f = v.fields, sel = v.product?.product_id;
-  const cards = v.options.map(o => {
+  const order = [...v.options].sort((a, b) => !a.carried - !b.carried ||
+    (sortBy === "low" ? a.list_price - b.list_price : sortBy === "high" ? b.list_price - a.list_price : 0));
+  const chip = (group, val, label, cur) => `<button class="chip2 ${val === cur ? "on" : ""}" data-${group}="${val}">${label}</button>`;
+  const controls = `<div class="chips2"><span class="lbl">Sort</span>${chip("sort", "relevance", "Relevance", sortBy)}
+      ${chip("sort", "low", "Price: low → high", sortBy)}${chip("sort", "high", "Price: high → low", sortBy)}</div>
+    <div class="chips2"><span class="lbl">Shop around for</span>${Object.entries(PREF_LABEL).map(([k, l]) => chip("pref", k, l, prefer)).join("")}</div>`;
+  const cards = order.map(o => {
     const ref = o.carried && f.competitor_price && f.competitor_product_id?.value === o.product_id
       ? `<div class="ref">Seen at ${esc(f.competitor_retailer.value)}: ${money(f.competitor_price.value)}</div>` : "";
     return o.carried
@@ -515,7 +546,7 @@ function renderOptions(v) {
   }).join("");
   const max = f.max_price?.value ?? 300, src = f.max_price?.source || "default";
   $("stage").innerHTML = `<div class="k">Your agent found ${v.options.filter(o => o.carried).length} options · pick one</div>
-    <div class="opts">${cards}</div>
+    ${controls}<div class="opts">${cards}</div>
     <div class="budget"><span class="k">Max I'll pay</span>
       <input type="range" id="maxPrice" min="150" max="500" step="5" value="${max}" />
       <b id="maxLabel">${money(max)}</b><span class="src ${src}">${src === "you" ? "YOU" : src.toUpperCase()}</span></div>
@@ -528,6 +559,8 @@ function renderOptions(v) {
   r.oninput = () => $("maxLabel").textContent = money(+r.value);
   r.onchange = () => choose(sel, +r.value);
   $("startBtn").onclick = () => start(intake.intake_id);
+  document.querySelectorAll("[data-sort]").forEach(b => b.onclick = () => { sortBy = b.dataset.sort; renderOptions(intake); });
+  document.querySelectorAll("[data-pref]").forEach(b => b.onclick = () => { prefer = b.dataset.pref; renderOptions(intake); });
 }
 async function choose(productId, maxPrice) {
   const r = await fetch(`/api/intake/${intake.intake_id}/choose`, { method: "POST", headers: { "Content-Type": "application/json" },

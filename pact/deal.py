@@ -27,7 +27,8 @@ Status = Literal["negotiating", "awaiting_approval", "complete", "failed"]
 class Deal:
     def __init__(self, pace: float = 1.2, deal_id: str | None = None, band: BandConfig | None = None,
                  shopper_state: ShopperState | None = None, on_complete=None,
-                 product_id: str = "sony-wh1000xm5"):
+                 product_id: str = "sony-wh1000xm5", merchant_id: str = "aria",
+                 discover: bool = True, hold_gate: bool = False):
         self.id = deal_id or f"deal-{random.randint(1000, 9999)}"
         self.pace = pace
         self.status: Status = "negotiating"
@@ -35,7 +36,12 @@ class Deal:
         self.product = scenario.product(product_id)
         self.shopper_state = shopper_state or ShopperState()
         self.on_complete = on_complete  # async callback(deal) after execution, e.g. remember the outcome
-        self.merchant_state = scenario.merchant_state(product_id)
+        self.merchant_id = merchant_id
+        self.merchant_info = scenario.MERCHANTS[merchant_id]
+        self.merchant_state = scenario.merchant_state(product_id, merchant_id)
+        self.discover = discover
+        self.hold_gate = hold_gate  # a Hunt compares agreements first, then releases the winner's gate
+        self.agreed = asyncio.Event()
         self.agreement: Agreement | None = None
         self.authority: dict | None = None
         self.execution: dict | None = None
@@ -93,7 +99,7 @@ class Deal:
         if self.room is None:
             try:
                 cfg = self._band or await bootstrap_agents()
-                if cfg:
+                if cfg and self.discover:
                     await self._discover(cfg)
                 self.room = await BandRoom.create(self.id, cfg) if cfg else LocalRoom(self.id)
             except Exception as e:  # noqa: BLE001 - never block the demo on BAND
@@ -104,7 +110,9 @@ class Deal:
         self.room.subscribe(self._on_room_message)
         self.shopper = ShopperAgent(self.room, self._trace, self.shopper_state, self.product,
                                     on_agreement=self._on_agreement, pace=self.pace)
-        zoowork_id = load_agent_id() if os.environ.get("PACT_MERCHANT", "zoowork") == "zoowork" else None
+        self.shopper.comparing = self.hold_gate
+        zoowork_id = (load_agent_id() if os.environ.get("PACT_MERCHANT", "zoowork") == "zoowork"
+                      and self.merchant_info["runtime"] == "zoowork" else None)
         if zoowork_id:  # ZooWork runs the merchant's reasoning; falls back to local logic per turn on failure
             self.merchant = ZooWorkMerchantAgent(self.room, self._trace, self.merchant_state, self.product,
                                                  agent_id=zoowork_id, pace=self.pace)
@@ -145,6 +153,14 @@ class Deal:
     def _on_agreement(self, agreement: Agreement) -> asyncio.Task:
         """Starts the authority gate. Returns the gate task, so the shopper may `await` it or not."""
         self.agreement = agreement
+        self.agreed.set()
+        if self.hold_gate:  # the Hunt decides which agreement goes to the authority gate
+            self._set_phase("agreed", agreement=agreement.model_dump(mode="json"))
+            return None
+        return self.release_gate()
+
+    def release_gate(self) -> asyncio.Task:
+        agreement = self.agreement
         self._set_phase("checking_authority", agreement=agreement.model_dump(mode="json"))
         task = asyncio.create_task(self._gate(agreement))
         self._tasks.add(task)
@@ -183,6 +199,7 @@ class Deal:
             self._fail(decision["reason"])
 
     def _fail(self, reason: str) -> None:
+        self.agreed.set()  # a Hunt waiting on this deal can stop waiting
         self.status = "failed"
         self.failure = reason
         self._set_phase("failed")
@@ -265,12 +282,18 @@ class DealStore:
 
     async def create(self, pace: float = 1.2, deal_id: str | None = None,
                      shopper_state: ShopperState | None = None, on_complete=None,
-                     product_id: str = "sony-wh1000xm5") -> Deal:
+                     product_id: str = "sony-wh1000xm5", shop_around: bool = False,
+                     preference: str = "best") -> Deal:
         old = self.deals.pop(deal_id, None) if deal_id else None
         if old is not None:
             await old.close()
-        deal = Deal(pace=pace, deal_id=deal_id, shopper_state=shopper_state, on_complete=on_complete,
-                    product_id=product_id)
+        if shop_around:  # negotiate with every merchant in parallel, keep the best agreement
+            from .hunt import Hunt
+            deal = Hunt(pace=pace, hunt_id=deal_id, shopper_state=shopper_state, product_id=product_id,
+                        preference=preference, on_complete=on_complete)
+        else:
+            deal = Deal(pace=pace, deal_id=deal_id, shopper_state=shopper_state, on_complete=on_complete,
+                        product_id=product_id)
         await deal.setup()
         self.deals[deal.id] = deal
         task = asyncio.create_task(deal.run())

@@ -76,9 +76,29 @@ CATALOG: dict[str, tuple[Product, dict]] = {
 }
 
 
+# Competing merchants. Each is its own BAND agent with its own private economics.
+MERCHANTS = {
+    "aria": {"name": "Aria Audio", "band_agent": "MerchantAgent", "key_env": "BAND_MERCHANT_AGENT_KEY",
+             "runtime": "zoowork"},
+    "soundhub": {"name": "SoundHub", "band_agent": "SoundHubAgent", "key_env": "BAND_SOUNDHUB_AGENT_KEY",
+                 "runtime": "local"},
+}
+
+# SoundHub: slightly cheaper shelf prices and free 3-day standard shipping (still arrives by Tuesday),
+# deep in black, but only 30-day returns and no silver.
+SOUNDHUB = {
+    "sony-wh1000xm5": dict(list_price=319.99, unit_cost=232, inventory={"black": 12, "silver": 0},
+                           overstock={"black"}, variant_floor={}, standard_shipping_days=3, max_return_days=30),
+    "sennheiser-m4": dict(list_price=254.99, unit_cost=168, inventory={"black": 7, "white": 2},
+                          overstock={"black"}, variant_floor={}, standard_shipping_days=3, max_return_days=30),
+    "bose-qc-ultra": dict(list_price=399.00, unit_cost=290, inventory={"black": 3, "white": 3},
+                          overstock=set(), variant_floor={}, standard_shipping_days=3, max_return_days=30),
+}
+
+
 def product(product_id: str) -> Product:
     return CATALOG[product_id][0]
 
 
-def merchant_state(product_id: str) -> MerchantState:
-    return MerchantState(**CATALOG[product_id][1])
+def merchant_state(product_id: str, merchant: str = "aria") -> MerchantState:
+    return MerchantState(**(CATALOG[product_id][1] if merchant == "aria" else SOUNDHUB[product_id]))
