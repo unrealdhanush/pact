@@ -23,7 +23,7 @@ The header shows one badge per sponsor integration: green **LIVE** or amber **SI
 | Integration | Live when | Fallback |
 |---|---|---|
 | **BAND** (deal room) | `BAND_HUMAN_API_KEY` (registers ShopperAgent + MerchantAgent once and caches their keys in gitignored `.env.band`) **or** `BAND_SHOPPER_AGENT_KEY` + `BAND_MERCHANT_AGENT_KEY` | In-process room, "local (simulated)". If BAND fails mid-deal the room degrades to local delivery and says so. |
-| **Jev** (authority gate) | `pact/authority.py` (merchant side) exposes `check_authority`; uses `JEV_API_KEY` / `JEV_BASE_URL` | Deterministic local policy rules in `pact/gate.py`, shown as "Jev live decision service unavailable — local policy rules". |
+| **Jev** (authority gate) | `pact/authority.py` (merchant side) exposes `check_authority` and `JEV_API_KEY` is set (see [Jev setup](#jev-setup-typesafe-ai)) | Deterministic local policy rules in `pact/gate.py`, shown as "Jev live decision service unavailable — local policy rules". |
 | **ZooWork** (merchant runtime) | `pact/zoowork.py` exposes `integration_status()` | Local merchant agent on the deterministic engine. |
 | **Tavily** (competitor price) | `pact/tavily.py` exposes `integration_status()` | No competitor check shown. |
 
@@ -53,6 +53,39 @@ agent (`POST /agent/chats/{id}/messages`) carrying the public protocol payload a
 block. Each agent listens on its own WebSocket (`chat_room:{id}` / `message_created`) and only acts
 on messages BAND delivers to it. The Jev decision and the human approval are posted as room events
 (`POST /agent/chats/{id}/events`). Private budgets, floors and inventory never enter the room.
+
+### Jev setup (TypeSafe AI)
+
+Keys come from [console.typesafe.ai/keys](https://console.typesafe.ai/keys). Docs: [docs.typesafe.ai](https://docs.typesafe.ai/introduction/quickstart).
+
+| Env | Default | Meaning |
+|---|---|---|
+| `JEV_API_KEY` | — | TypeSafe console key, sent as `Authorization: Bearer $JEV_API_KEY` |
+| `JEV_BASE_URL` | `https://api.typesafe.ai` | API **root**; the decision endpoint is `$JEV_BASE_URL/v1/systemone` |
+| `JEV_MODEL` | `jev-latest` | Required by the API; pin e.g. `jev-1.13.0` for a stable demo |
+
+One call, one Choice question whose options are exactly Pact's three decisions:
+
+```bash
+curl -X POST "$JEV_BASE_URL/v1/systemone" -H "Authorization: Bearer $JEV_API_KEY" -H "Content-Type: application/json" -d '{
+  "model": "jev-latest",
+  "state": {"transaction_id": "deal-1842", "terms": {"price": 219, "variant": "silver", "shipping": "free_next_day", "return_window_days": 45},
+            "merchant_policy_checks": "all pass", "shopper_auto_approve_limit_usd": 200, "shopper_max_price_usd": 220},
+  "questions": {
+    "decision": {"type": "choice", "instructions": "May the agents execute this purchase without a human?",
+      "criteria": {"AUTO_APPROVE": "Inside every bound and under the auto-approve limit",
+                   "HUMAN_APPROVAL_REQUIRED": "Allowed, but exceeds a human approval threshold or needs sign-off",
+                   "REJECT": "Violates a merchant or shopper boundary"}},
+    "needs_human": {"type": "noul", "instructions": "Does this purchase require the shopper's human approval?"}
+  }}'
+# → {"model":"jev-1.13.0","answers":{"decision":{"type":"choice","choice":"HUMAN_APPROVAL_REQUIRED","confidence":…,"probabilities":{…}},
+#    "needs_human":{"type":"noul","noul":…}},"usage":{…}}
+```
+
+Errors: `401` bad key, `422` invalid body, `429`/`529` retry with backoff. Pact never lets Jev loosen
+the local rules (`pact/gate.py` takes the stricter decision) and falls back to them on any error or timeout.
+Keys created at the jevtypesafeai.com gateway (`jv_live_…`) are a different service
+(`https://jevtypesafeai.com/api/v1/decide`) and do not work at `api.typesafe.ai`.
 
 ## Demo script (≈2 min)
 
