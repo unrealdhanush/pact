@@ -5,242 +5,227 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pact — the transaction layer for agentic commerce</title>
 <style>
-  :root {
-    --bg: #0b0d10; --panel: #13161b; --panel2: #181c22; --line: #252a32; --text: #eef0f3; --muted: #8a93a1;
-    --shopper: #4fd1c5; --shopper-dim: rgba(79,209,197,.11);
-    --merchant: #f6ad55; --merchant-dim: rgba(246,173,85,.11);
-    --ok: #68d391; --ok-dim: rgba(104,211,145,.12); --warn: #f6c453; --warn-dim: rgba(246,196,83,.12);
-    --bad: #fc8181; --bad-dim: rgba(252,129,129,.12); --jev: #b794f4; --jev-dim: rgba(183,148,244,.12);
-    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body { margin: 0; background: radial-gradient(1200px 600px at 50% -200px, #161b24 0%, var(--bg) 60%); color: var(--text);
-         font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; overflow: hidden; }
-  header { display: flex; align-items: center; gap: 18px; padding: 12px 24px; border-bottom: 1px solid var(--line); height: 60px; }
-  .brand { font-size: 24px; font-weight: 800; letter-spacing: .2em; }
-  .tag { color: var(--muted); font-size: 14px; }
-  .chips { margin-left: auto; display: flex; gap: 8px; align-items: center; }
-  .chip { font: 12px var(--mono); padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
-  .chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); display: inline-block; }
-  .chip.live { color: var(--ok); border-color: rgba(104,211,145,.4); } .chip.live i { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
-  .chip.fallback { color: var(--warn); border-color: rgba(246,196,83,.35); } .chip.fallback i { background: var(--warn); }
-  .chip b { font-weight: 700; color: var(--text); }
-  .chip.deal { color: var(--text); border-color: #3a414c; }
 
-  main { display: grid; grid-template-columns: 300px 1fr 300px; gap: 16px; padding: 14px 24px 16px; height: calc(100vh - 60px); }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; display: flex; flex-direction: column; min-height: 0; transition: opacity .5s, filter .5s; }
-  body.decision .side { opacity: .45; filter: saturate(.6); }
-  .side h2 { margin: 0; padding: 14px 18px 2px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; }
-  .shopper .dot { background: var(--shopper); box-shadow: 0 0 12px var(--shopper); }
-  .merchant .dot { background: var(--merchant); box-shadow: 0 0 12px var(--merchant); }
-  .sub { padding: 0 18px; color: var(--muted); font-size: 13px; }
-  .label { padding: 12px 18px 6px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); display: flex; gap: 8px; align-items: center; }
-  .lock { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #222730; letter-spacing: .05em; }
-  dl { margin: 0; padding: 0 18px; display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; font-size: 14px; }
-  dt { color: var(--muted); } dd { margin: 0; font-weight: 600; text-align: right; }
-  .trace { flex: 1; overflow-y: auto; padding: 2px 18px 16px; font: 12px/1.5 var(--mono); min-height: 0; }
-  .trace div { padding: 4px 0; border-bottom: 1px dashed #1f232a; color: #b8c0cc; animation: in .3s ease; }
-  .trace .tool::before { content: "▸ "; color: var(--merchant); }
-  .trace .think::before { content: "› "; color: var(--muted); }
-  .shopper .trace .think::before { color: var(--shopper); }
+:root { --bg:#f5f5f7; --panel:#fff; --panel2:#f5f5f7; --line:#e8e8ed; --text:#1d1d1f; --muted:#6e6e73; --shopper:#0071e3; --shopper-dim:#eef6ff; --merchant:#7155b6; --merchant-dim:#f5f1fc; --ok:#237b4b; --ok-dim:#eef7f0; --warn:#8f611c; --warn-dim:#fff6e8; --bad:#b83635; --bad-dim:#fff0ef; --jev:#7155b6; --jev-dim:#f5f1fc; --mono:ui-monospace,SFMono-Regular,Menlo,monospace; }
+* { box-sizing:border-box; }
+[hidden] { display:none!important; }
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; }
+button,input { font:inherit; }
+button { cursor:pointer; border:0; }
+button:disabled { opacity:.55; cursor:wait; }
+button { transition:background .2s,transform .2s,box-shadow .2s; }
+button:hover:not(:disabled) { filter:brightness(.97); }
+button:active:not(:disabled) { transform:scale(.98); }
+:focus-visible { outline:3px solid #0071e380; outline-offset:4px; }
+header { height:64px; display:flex; align-items:center; gap:28px; max-width:1280px; margin:auto; padding:0 40px; position:relative; }
+.brand { font-size:24px; font-weight:650; letter-spacing:-1px; }
+.tag { font-size:12px; color:var(--muted); }
+.header-end { margin-left:auto; display:flex; align-items:center; gap:24px; }
+.demo-label { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.demo-label::before { content:''; width:6px; height:6px; background:var(--ok); border-radius:50%; }
+.systems { font-size:12px; color:var(--muted); }
+.systems summary { cursor:pointer; list-style:none; }
+.systems summary::after { content:'⌄'; margin-left:6px; }
+.chips { position:absolute; right:40px; top:55px; z-index:3; background:#fff; box-shadow:0 12px 40px #00000016; padding:16px; border-radius:16px; display:flex; flex-direction:column; gap:8px; min-width:260px; border:1px solid var(--line); }
+.chip { display:flex; gap:8px; align-items:center; font-size:11px; color:var(--muted); }
+.chip b { color:var(--text); margin-right:auto; }
+.chip i { width:6px; height:6px; border-radius:50%; background:var(--warn); }
+.chip.live i { background:var(--ok); }
+.chip.deal { padding-bottom:8px; border-bottom:1px solid var(--line); }
+.intro { max-width:1280px; margin:20px auto 26px; padding:0 40px; }
+.intro h1 { font-size:clamp(30px,3.2vw,44px); line-height:1.12; letter-spacing:-1.8px; font-weight:600; margin:0 0 10px; }
+.intro p { margin:0; color:var(--muted); font-size:15px; }
+main { max-width:1280px; margin:auto; padding:0 40px 40px; display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:20px; align-items:start; }
+section { background:var(--panel); border-radius:24px; min-width:0; box-shadow:0 2px 8px #00000003; }
+.center { grid-column:1; grid-row:1 / span 2; display:flex; flex-direction:column; overflow:hidden; min-height:540px; }
+.side { grid-column:2; padding:22px 24px; }
+.shopper { grid-row:1; }
+.merchant { grid-row:2; }
+.side h2 { font-size:16px; letter-spacing:-.4px; display:flex; align-items:center; gap:10px; margin:0 0 4px; }
+.dot { display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:var(--shopper-dim); color:var(--shopper); }
+.dot::before { content:'↗'; font-size:19px; font-weight:400; }
+.merchant .dot { background:var(--merchant-dim); color:var(--merchant); }
+.merchant .dot::before { content:'▦'; }
+.sub { color:var(--muted); font-size:12px; }
+.agent-note { color:var(--muted); font-size:12px; margin-top:14px; }
+.agent-note b { font-weight:400; }
+.agent-note .extra { display:none; }
+.label { font-size:11px; color:var(--muted); margin:16px 0 8px; display:flex; align-items:center; justify-content:space-between; }
+.lock { font-size:9px; letter-spacing:.02em; color:#86868b; }
+dl { margin:0; display:grid; grid-template-columns:1fr 1fr; gap:7px 12px; font-size:12px; }
+dt { color:var(--muted); } dd { text-align:right; margin:0; font-weight:500; overflow-wrap:anywhere; }
+.key-rules { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; }
+.key-rule { display:block; min-width:0; background:var(--panel2); border-radius:13px; padding:12px; }
+.key-rule dt { font-size:11px; }
+.key-rule dd { text-align:left; font-size:22px; letter-spacing:-.7px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.key-rule .src { display:block; width:max-content; margin:4px 0 0; }
+.rule-details { margin-top:14px; }
+details { color:var(--muted); font-size:12px; }
+summary { cursor:pointer; }
+.rule-details dl { margin-top:12px; }
+.reasoning { margin-top:12px; }
+.trace { max-height:180px; overflow:auto; font:11px/1.6 var(--mono); margin-top:10px; }
+.trace div { padding:5px 0; border-bottom:1px solid var(--line); }
+.talk { margin-top:18px; }
+.convo { max-height:170px; overflow:auto; display:flex; flex-direction:column; gap:6px; }
+.hint { font-size:12px; color:var(--muted); margin-bottom:10px; }
+.b { border-radius:12px; padding:9px 11px; font-size:12px; }
+.b.you { background:var(--panel2); align-self:flex-end; }
+.b.agent { background:var(--shopper-dim); }
+.talk form { display:flex; gap:6px; padding:6px; background:var(--panel2); border-radius:14px; }
+.talk input { width:100%; min-width:0; border:0; background:transparent; padding:7px 0; font-size:12px; color:var(--text); outline-offset:0; }
+.mic { background:transparent; color:var(--muted); padding:6px; border-radius:8px; display:grid; place-items:center; }
+.mic.on { background:var(--shopper-dim); color:var(--shopper); }
+.send { width:30px; flex:none; border-radius:50%; background:var(--shopper); color:white; font-size:17px; }
+.mems { font-size:11px; color:var(--muted); }
+.mems div { margin:8px 0; }.ms { margin-left:5px; color:var(--shopper); }
+.src { font-size:9px; padding:2px 5px; border-radius:5px; background:var(--panel2); margin-left:5px; letter-spacing:0; white-space:nowrap; }
+.src.live { color:var(--ok); background:var(--ok-dim); }.src.fallback { color:var(--warn); background:var(--warn-dim); }
+.flow { display:flex; justify-content:space-between; gap:12px; padding:22px 28px; border-bottom:1px solid var(--line); }
+.flow span { color:#86868b; font-size:11px; display:flex; align-items:center; gap:7px; }
+.flow b { display:grid; place-items:center; border:1px solid var(--line); border-radius:50%; width:22px; height:22px; font-size:10px; font-weight:500; }
+.flow .active { color:var(--text); }.flow .active b { background:var(--shopper-dim); border-color:transparent; color:var(--shopper); }
+.path { display:flex; align-items:center; padding:14px 28px; gap:8px; overflow:auto; border-bottom:1px solid var(--line); min-height:66px; }
+.step { flex:none; font-size:13px; font-weight:600; color:var(--muted); padding:0 4px; }
+.step small { display:block; font-size:9px; font-weight:400; color:var(--muted); margin-top:1px; text-transform:lowercase; }
+.step.struck { text-decoration:line-through; }.step.current,.step.final { color:var(--text); }.step.warn { color:var(--warn); }.step.jev { color:var(--jev); }.step.bad { color:var(--bad); }
+.link { width:16px; height:1px; background:var(--line); flex:none; }
+.roomhead { padding:18px 28px 8px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; color:var(--muted); font-size:10px; }
+.room { padding:10px 28px 18px; display:flex; flex-direction:column; gap:16px; height:285px; overflow:auto; }
+.msg { padding:14px 16px; max-width:94%; font-size:14px; line-height:1.55; border-radius:18px; animation:arrive .35s ease-out; }
+.msg.ShopperAgent { align-self:flex-start; background:var(--shopper-dim); }.msg.MerchantAgent { align-self:flex-end; background:var(--panel2); }.msg.system { align-self:stretch; background:transparent; color:var(--muted); font-size:11px; padding:8px 0; }
+.who { display:flex; gap:8px; align-items:center; font-size:10px; margin-bottom:6px; color:var(--muted); flex-wrap:wrap; }.who b { font-weight:600; color:var(--text); }.via { margin-left:auto; font-size:9px; }.mention { color:var(--muted); }
+.quotes { width:100%; margin-top:8px; border-collapse:collapse; font-size:10px; }.quotes td { padding:6px 4px; border-top:1px solid var(--line); }.quotes .win { color:var(--ok); }
+.typing { min-height:24px; padding:0 28px; color:var(--muted); font-size:11px; }
+.stage { padding:22px 28px; border-top:1px solid var(--line); text-align:center; }
+body.idle .path,body.idle .roomhead,body.idle .room,body.idle .typing { display:none; }
+body.idle .stage { border:0; flex:1; display:block; padding:20px 36px 32px; }
+.welcome { width:100%; text-align:center; }
+.product-art { width:210px; height:210px; margin:0 auto 4px; display:block; filter:drop-shadow(0 14px 12px #00000017); }
+.welcome h2 { font-size:28px; line-height:1.15; letter-spacing:-1px; margin:0 0 10px; font-weight:600; }
+.welcome p { color:var(--muted); font-size:14px; max-width:420px; margin:0 auto 20px; }
+.product-line { font-size:12px; color:var(--muted); margin:0 0 14px; }
+.start,.cta { background:var(--shopper); color:#fff; padding:12px 24px; border-radius:999px; font-size:14px; font-weight:500; min-height:44px; }
+.start:hover,.cta:hover { background:#0077ed; }
+.label2 { font-size:11px; color:var(--muted); margin-top:8px; }
+.k { font-size:11px; color:var(--muted); letter-spacing:0; text-transform:none; }
+.price { font-size:50px; line-height:1.1; letter-spacing:-2px; font-weight:600; margin:10px 0 14px; font-variant-numeric:tabular-nums; }
+.price s { font-size:19px; font-weight:400; color:#86868b; letter-spacing:-.4px; margin-right:10px; }
+.terms { display:flex; justify-content:center; flex-wrap:wrap; gap:6px; margin:8px 0; }
+.terms span { font-size:11px; padding:5px 9px; border-radius:7px; background:var(--panel2); }
+.save { color:var(--ok); font-size:12px; margin-top:12px; }
+body.decision .roomhead,body.decision .room,body.decision .typing { display:none; }
+body.decision .stage { border:0; flex:1; padding:28px; }
+.decide { display:grid; grid-template-columns:1fr 1fr; gap:18px; text-align:left; }
+.card { border:1px solid var(--line); border-radius:18px; padding:20px; min-width:0; }
+.card.agree { text-align:center; background:linear-gradient(180deg,#f6faff,#fff); display:flex; flex-direction:column; justify-content:center; }
+.auth h3 { display:flex; align-items:center; justify-content:space-between; gap:5px; font-size:12px; font-weight:600; margin:0 0 14px; }.auth h3 .src { font-weight:400; }
+.row { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 0; border-bottom:1px solid var(--line); font-size:11px; }
+.pill { font-size:9px; padding:3px 6px; border-radius:5px; }.pill.pass { color:var(--ok); background:var(--ok-dim); }.pill.req { color:var(--warn); background:var(--warn-dim); }.pill.fail { color:var(--bad); background:var(--bad-dim); }
+.verdict { display:flex; align-items:center; gap:10px; justify-content:space-between; margin-top:14px; font-size:13px; font-weight:500; }.verdict.HUMAN_APPROVAL_REQUIRED { color:var(--warn); }.verdict.AUTO_APPROVE { color:var(--ok); }.verdict.REJECT { color:var(--bad); }
+.reason { color:var(--muted); font-size:11px; margin:8px 0 12px; }.auth details { font-size:10px; }.auth ul { margin:10px 0 0; padding:0; list-style:none; }.auth li { margin:7px 0; }
+.actions { display:flex; flex-direction:column; align-items:center; gap:7px; margin-top:22px; }.cta { font-size:17px; padding:14px 32px; }.cta kbd { font:10px var(--mono); opacity:.75; border:1px solid #ffffff70; border-radius:4px; padding:2px 4px; margin-left:12px; }
+.ghost { background:none; color:var(--shopper); font-size:12px; padding:6px; }.again { background:var(--panel2); color:var(--text); border-radius:999px; padding:11px 20px; font-size:13px; }
+.why { text-align:left; color:var(--muted); font-size:12px; padding-left:18px; max-width:500px; }
+.done .check { display:grid; place-items:center; width:46px; height:46px; border-radius:50%; color:var(--ok); background:var(--ok-dim); font-size:25px; margin:0 auto 16px; }.done .big { font-size:28px; font-weight:600; letter-spacing:-1px; }.done .meta { font-size:10px; color:var(--muted); margin-top:14px; }.simnote { font-size:10px; color:var(--muted); margin-top:8px; }.done .sum { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:20px 0; text-align:left; }.sum div { border-radius:12px; padding:12px; background:var(--panel2); color:var(--muted); font-size:11px; }.sum b { display:block; color:var(--text); font-size:12px; margin-bottom:4px; }.blocked .big { color:var(--bad); }
+.track { text-align:left; margin-top:20px; }.track .steps { display:grid; grid-template-columns:repeat(5,1fr); list-style:none; padding:0; gap:5px; font-size:10px; }.track li { border-top:2px solid var(--line); padding-top:8px; }.track li.done,.track li.now { border-color:var(--shopper); }.track b { display:block; font-size:10px; }.track small,.tl { color:var(--muted); font-size:10px; }
+.opts { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin:18px 0; text-align:left; }.opt { border:1px solid var(--line); border-radius:16px; padding:16px; cursor:pointer; transition:border-color .2s,background .2s; }.opt.sel { border-color:var(--shopper); background:var(--shopper-dim); }.opt.off { opacity:.5; cursor:default; }.opt .nm { font-size:13px; font-weight:600; }.opt .sp,.opt .ref,.opt .vr { font-size:10px; color:var(--muted); margin-top:6px; }.opt .pr { font-size:24px; font-weight:600; margin-top:10px; }
+.chips2 { display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin:10px 0; }.chip2 { border-radius:999px; background:var(--panel2); color:var(--muted); padding:6px 10px; font-size:10px; }.chip2.on { background:var(--shopper-dim); color:var(--shopper); }.chips2 .lbl { color:var(--muted); font-size:10px; align-self:center; margin-right:5px; }.budget { display:flex; align-items:center; justify-content:center; gap:10px; margin:18px 0; }.budget input { max-width:40%; accent-color:var(--shopper); }
+.notice { background:var(--warn-dim); color:var(--warn); font-size:12px; padding:12px 28px; }.muted { color:var(--muted); }.ico { vertical-align:-2px; }.spin { display:inline-block; width:14px; height:14px; border:2px solid var(--line); border-top-color:var(--shopper); border-radius:50%; animation:spin 1s linear infinite; margin-right:8px; vertical-align:-2px; }
+@keyframes spin { to { transform:rotate(360deg); } } @keyframes arrive { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@media (max-width:1000px) { main { grid-template-columns:minmax(0,1fr) 280px; gap:16px; padding:0 24px 32px; }.intro,header { padding-left:24px;padding-right:24px; }.side { padding:20px; }.decide { grid-template-columns:1fr; }.price { font-size:44px; }.flow { padding:20px; gap:8px; }.flow span { font-size:10px; }.flow b { display:none; }.stage { padding:20px; } }
+@media (max-width:700px) { header { height:60px; }.tag { display:none; }.header-end { gap:16px; }.intro { margin:20px auto 24px; }.intro h1 { font-size:32px; letter-spacing:-1px; }.intro p { font-size:13px; max-width:280px; }main { display:flex; flex-direction:column; padding:0 16px 24px; gap:16px; }.center { width:100%; min-height:480px; }.side { width:100%; }.flow { padding:18px 20px; }.room,.roomhead { padding-left:20px; padding-right:20px; }.room { height:320px; }.path { padding:14px 20px; }.product-art { width:180px; height:180px; }body.idle .stage { padding:20px 24px 28px; }.welcome h2 { font-size:25px; }body.decision .stage { padding:20px; }.done .sum { grid-template-columns:1fr; }.chips { right:16px; }.demo-label { font-size:10px; } }
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } }
 
-  /* shopper intake (Moss) ---------------------------------------------------- */
-  .talk { margin: 10px 14px 0; border: 1px solid var(--line); border-radius: 12px; background: #12151a; display: flex; flex-direction: column; max-height: 42vh; }
-  .talk .convo { overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; min-height: 40px; }
-  .talk .b { font-size: 13px; line-height: 1.4; padding: 7px 10px; border-radius: 10px; max-width: 92%; animation: in .25s ease; }
-  .talk .b.you { align-self: flex-end; background: #23303a; }
-  .talk .b.agent { align-self: flex-start; background: var(--shopper-dim); border: 1px solid rgba(79,209,197,.28); }
-  .talk .hint { color: var(--muted); font-size: 12px; padding: 2px 2px 4px; }
-  .talk form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
-  .talk input { flex: 1; min-width: 0; background: #0d0f12; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px; }
-  .talk input:focus { outline: none; border-color: var(--shopper); }
-  .mic { width: 36px; border-radius: 8px; background: #1c2128; color: var(--text); display: grid; place-items: center; }
-  .mic:disabled { opacity: .4; cursor: not-allowed; }
-  .ico { display: inline-block; vertical-align: -2px; flex: none; }
-  .verdict-ico { display: inline-flex; }
-  .mic.on { background: var(--shopper); color: #0d0f12; animation: pulse 1.2s infinite; }
-  .mems { padding: 0 18px; font-size: 12px; }
-  .mems div { padding: 4px 0; color: #b8c0cc; border-bottom: 1px dashed #1f232a; animation: in .3s ease; }
-  .mems .ms { font: 11px var(--mono); color: var(--shopper); margin-left: 6px; }
-  .src { font: 600 9px var(--mono); letter-spacing: .06em; padding: 1px 5px; border-radius: 4px; margin-left: 6px; vertical-align: 1px; }
-  .src.you { background: #23303a; color: #cfe3f0; }
-  .src.memory { background: var(--shopper-dim); color: var(--shopper); }
-  .src.default { background: #222730; color: var(--muted); }
 
-  /* center ---------------------------------------------------------------- */
-  .center { padding: 0; overflow: hidden; }
-  .path { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; row-gap: 8px; padding: 12px 18px 10px; border-bottom: 1px solid var(--line); min-height: 60px; }
-  .path.long .step { font-size: 13px; padding: 5px 9px; }
-  .path.long .link { width: 14px; }
-  .path .muted { margin: auto; }
-  .step { position: relative; flex: none; font-size: 15px; font-weight: 700; padding: 6px 11px; border-radius: 9px; background: #1c2027; color: var(--muted); white-space: nowrap; animation: pop .45s cubic-bezier(.2,1.4,.4,1); }
-  .step small { display: block; font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
-  .step.struck { text-decoration: line-through; }
-  .step.current { color: var(--text); background: #232a33; outline: 2px solid var(--text); }
-  .step.final { color: #0b0d10; background: var(--ok); }
-  .step.jev { color: var(--jev); background: var(--jev-dim); outline: 1px solid rgba(183,148,244,.5); }
-  .step.warn { color: #0b0d10; background: var(--warn); }
-  .step.bad { color: #0b0d10; background: var(--bad); }
-  .link { flex: none; width: 22px; height: 2px; background: var(--line); position: relative; overflow: hidden; }
-  .link::after { content: ""; position: absolute; inset: 0; background: var(--text); transform: translateX(-100%); animation: fill .4s .05s forwards; }
+/* Translucent surfaces have an opaque fallback when backdrop filtering is unavailable. */
+body { background:#f2f4f8; background-image:radial-gradient(ellipse at 5% 25%,#dbe8f580,transparent 45%),radial-gradient(ellipse at 100% 55%,#e8e1f180,transparent 40%); min-height:100vh; }
+section { background:#ffffffd9; border:1px solid #ffffff; box-shadow:0 8px 36px #27374e06; backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); }
+header { z-index:5; }
+.header-link { color:var(--muted); background:none; font-size:12px; padding:6px 0; }
+.landing { max-width:1280px; margin:30px auto 0; padding:0 40px 36px; }
+.landing-hero { position:relative; display:grid; grid-template-columns:1.1fr 1fr; gap:50px; align-items:center; min-height:460px; padding:44px 40px; }
+.landing .eyebrow { color:var(--muted); font-size:13px; margin-bottom:20px; }
+.landing h1 { font-size:clamp(48px,5.5vw,76px); font-weight:600; letter-spacing:-3.8px; line-height:1.04; margin:0 0 24px; }
+.landing h1 span { color:#727b8d; }
+.landing-copy p { color:var(--muted); font-size:18px; line-height:1.55; max-width:430px; margin:0 0 28px; }
+.landing .start { padding:14px 25px; font-size:15px; }
+.landing .label2 { margin-top:14px; font-size:11px; }
+.landing-visual { position:relative; min-height:370px; display:grid; place-items:center; }
+.visual-halo { position:absolute; width:350px; height:350px; border-radius:50%; background:radial-gradient(circle,#e0e6f4,#ececf440 65%,transparent 72%); }
+.landing-visual .product-art { width:300px; height:300px; position:relative; transform:rotate(8deg); }
+.floating-offer { position:absolute; bottom:0; left:12px; right:0; display:flex; align-items:center; gap:16px; padding:18px 22px; border:1px solid #ffffff; border-radius:22px; background:#ffffffaa; box-shadow:0 14px 48px #2634490c; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+.floating-offer .offer-icon { width:38px; height:38px; border-radius:50%; background:var(--ok-dim); color:var(--ok); display:grid; place-items:center; font-size:20px; }
+.floating-offer strong { font-size:14px; font-weight:600; display:block; }.floating-offer small { display:block; color:var(--muted); font-size:12px; margin-top:2px; }.floating-offer .offer-price { margin-left:auto; text-align:right; font-size:24px; font-weight:600; letter-spacing:-.6px; }.floating-offer .offer-price small { font-size:10px; letter-spacing:0; font-weight:400; }
+.landing-features { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:24px; }
+.landing-feature { background:#ffffff70; border:1px solid #ffffffb0; border-radius:20px; padding:22px 24px; }
+.landing-feature .num { font-size:11px; color:#86868b; margin-bottom:14px; }.landing-feature h2 { font-size:16px; font-weight:600; letter-spacing:-.3px; margin:0 0 6px; }.landing-feature p { font-size:12px; color:var(--muted); margin:0; max-width:290px; }
+.landing-footer { display:flex; justify-content:space-between; font-size:11px; color:#86868b; margin-top:24px; padding:0 4px; }
+.view-enter { animation:view-in .45s cubic-bezier(.2,.7,.2,1); }
+@keyframes view-in { from { opacity:0; transform:translateY(12px); } to { opacity:1;transform:translateY(0); } }
+body.review-timeline .room,body.review-timeline .roomhead { display:flex; }
+body.review-timeline .room { height:260px; }
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) { section,.floating-offer { background:#fff; } }
+@media(max-width:1000px) { .landing { padding:0 24px 30px; margin-top:16px; }.landing-hero { padding:24px 12px; gap:24px; }.landing h1 { font-size:54px; }.landing-copy p { font-size:16px; }.landing-visual .product-art { width:250px;height:250px; }.floating-offer { left:0;padding:16px; }.floating-offer strong { font-size:12px; }.floating-offer small { font-size:10px; }.landing-features { gap:12px; }.landing-feature { padding:20px; } }
+@media(max-width:700px) { .landing { padding:0 20px 28px; margin:20px auto 0; }.landing-hero { display:flex; flex-direction:column; padding:0; gap:10px; min-height:0; align-items:stretch; }.landing h1 { font-size:49px;letter-spacing:-2.6px; }.landing .eyebrow { font-size:12px;margin-bottom:16px; }.landing-copy p { font-size:15px;max-width:320px; }.landing-visual { min-height:310px; }.landing-visual .product-art { width:245px;height:245px;margin-bottom:40px; }.visual-halo { width:280px;height:280px; }.floating-offer { bottom:0; }.landing-features { grid-template-columns:1fr; margin-top:30px; }.landing-feature .num { margin-bottom:8px; }.landing-footer { gap:15px; }.header-end { gap:16px; }.header-link { font-size:11px; } }
 
-  .roomhead { padding: 9px 18px; font: 600 13px var(--mono); color: var(--muted); display: flex; justify-content: space-between; gap: 10px; }
-  .roomhead .live { color: var(--ok); } .roomhead .sim { color: var(--warn); }
-  .room { flex: 1; overflow-y: auto; padding: 2px 18px 12px; display: flex; flex-direction: column; gap: 10px; min-height: 0; transition: flex .5s; }
-  .msg { max-width: 84%; padding: 10px 14px; border-radius: 14px; font-size: 15px; line-height: 1.4; animation: in .35s ease; }
-  .msg .who { font: 600 11px var(--mono); letter-spacing: .05em; margin-bottom: 3px; display: flex; gap: 8px; }
-  .msg .who .via { color: var(--muted); font-weight: 400; }
-  .msg .who .store { color: var(--text); font-weight: 600; opacity: .8; }
-  .quotes { width: 100%; border-collapse: collapse; margin-top: 6px; font: 12px var(--mono); }
-  .quotes td { padding: 3px 6px; border-top: 1px dashed #2a2f37; text-align: left; }
-  .quotes tr.win td { color: var(--ok, #68d391); font-weight: 700; }
-  .track { margin: 14px auto 4px; max-width: 560px; text-align: left; }
-  .track .steps { list-style: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 0; margin: 10px 0 6px; }
-  .track .steps li { position: relative; padding-top: 18px; font-size: 12px; color: var(--muted); }
-  .track .steps li::before { content: ""; position: absolute; top: 6px; left: 0; right: 0; height: 2px; background: var(--line); }
-  .track .steps li.done::before, .track .steps li.now::before { background: var(--shopper); }
-  .track .dotc { position: absolute; top: 1px; left: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--panel); border: 2px solid var(--line); }
-  .track li.done .dotc { background: var(--shopper); border-color: var(--shopper); }
-  .track li.now .dotc { background: var(--panel); border-color: var(--shopper); box-shadow: 0 0 0 4px var(--shopper-dim); animation: pulse 1.4s infinite; }
-  .track li b { display: block; color: var(--text); font-weight: 600; } .track li small { font: 11px var(--mono); }
-  .track .tl { font-size: 13px; color: #b8c0cc; }
-  .chips2 { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 2px 0 8px; }
-  .chip2 { font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); background: #12151a; color: var(--muted); cursor: pointer; }
-  .chip2.on { color: #0d0f12; background: var(--shopper); border-color: var(--shopper); font-weight: 600; }
-  .chips2 .lbl { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); align-self: center; margin-right: 4px; }
-  .msg.ShopperAgent { align-self: flex-start; background: var(--shopper-dim); border: 1px solid rgba(79,209,197,.32); border-bottom-left-radius: 4px; }
-  .msg.ShopperAgent .who b { color: var(--shopper); }
-  .msg.MerchantAgent { align-self: flex-end; background: var(--merchant-dim); border: 1px solid rgba(246,173,85,.32); border-bottom-right-radius: 4px; }
-  .msg.MerchantAgent .who b { color: var(--merchant); }
-  .msg.system { align-self: center; max-width: 92%; background: var(--jev-dim); border: 1px solid rgba(183,148,244,.35); font: 12px var(--mono); color: #d6c7f7; }
-  .mention { font-weight: 700; opacity: .75; }
-  .typing { color: var(--muted); font: 12px var(--mono); padding: 0 18px 6px; height: 20px; }
-
-  .stage { border-top: 1px solid var(--line); padding: 16px 18px; text-align: center; background: linear-gradient(180deg, transparent, rgba(255,255,255,.015)); }
-  body.decision .room { flex: 0 0 120px; }
-  body.decision .stage { flex: 1; display: flex; flex-direction: column; justify-content: center; border-top-color: #333a45; }
-  .k { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
-  /* product options ------------------------------------------------------- */
-  .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 10px 0 14px; text-align: left; }
-  .opt { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #12151a; cursor: pointer;
-         transition: border-color .2s, transform .2s, background .2s; display: flex; flex-direction: column; gap: 4px; }
-  .opt:hover { transform: translateY(-2px); border-color: #3a414c; }
-  .opt.sel { border-color: var(--shopper); background: var(--shopper-dim); }
-  .opt.off { opacity: .45; cursor: not-allowed; transform: none; }
-  .opt .nm { font-weight: 700; font-size: 14px; }
-  .opt .sp { color: var(--muted); font-size: 11.5px; line-height: 1.35; }
-  .opt .pr { font-size: 20px; font-weight: 800; margin-top: 4px; }
-  .opt .ref { font-size: 11.5px; color: var(--shopper); }
-  .opt .vr { font: 11px var(--mono); color: var(--muted); }
-  .budget { display: flex; align-items: center; gap: 12px; justify-content: center; margin: 4px 0 14px; font-size: 14px; }
-  .budget input[type=range] { width: 46%; accent-color: var(--shopper); }
-  .budget b { font-size: 20px; min-width: 70px; text-align: left; }
-  .price { font-size: 52px; font-weight: 800; line-height: 1.05; margin: 2px 0; letter-spacing: -.01em; }
-  .price s { font-size: 24px; color: var(--muted); font-weight: 500; margin-right: 10px; }
-  .terms { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
-  .terms span { padding: 5px 11px; border-radius: 8px; background: #1f242c; font-size: 14px; font-weight: 600; }
-  .save { color: var(--ok); font-weight: 700; font-size: 14px; margin-top: 4px; }
-
-  .decide { display: grid; grid-template-columns: 1fr 1.1fr; gap: 14px; text-align: left; animation: in .5s ease; }
-  .card { background: var(--panel2); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
-  .card.agree { text-align: center; border-color: rgba(104,211,145,.35); box-shadow: 0 0 0 1px rgba(104,211,145,.08), 0 20px 50px -30px rgba(104,211,145,.45); }
-  .card.agree .price { font-size: 64px; }
-  .auth { border-color: rgba(183,148,244,.35); }
-  .auth h3 { margin: 0 0 4px; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--jev); display: flex; justify-content: space-between; align-items: center; }
-  .src { font: 10px var(--mono); letter-spacing: 0; text-transform: none; padding: 2px 7px; border-radius: 5px; }
-  .src.live { color: var(--ok); background: var(--ok-dim); } .src.fallback { color: var(--warn); background: var(--warn-dim); }
-  .row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 15px; font-weight: 600; }
-  .pill { font: 700 12px var(--mono); padding: 4px 9px; border-radius: 6px; letter-spacing: .03em; }
-  .pill.pass { color: var(--ok); background: var(--ok-dim); } .pill.req { color: var(--warn); background: var(--warn-dim); } .pill.fail { color: var(--bad); background: var(--bad-dim); }
-  .verdict { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-weight: 800; font-size: 17px; letter-spacing: .03em; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
-  .verdict.HUMAN_APPROVAL_REQUIRED { background: var(--warn-dim); color: var(--warn); border: 1px solid rgba(246,196,83,.4); }
-  .verdict.AUTO_APPROVE { background: var(--ok-dim); color: var(--ok); border: 1px solid rgba(104,211,145,.4); }
-  .verdict.REJECT { background: var(--bad-dim); color: var(--bad); border: 1px solid rgba(252,129,129,.4); }
-  .reason { color: #c7ced8; font-size: 13px; margin-top: 8px; }
-  .label2 { font: 11px var(--mono); color: var(--muted); margin-top: 6px; }
-  details { margin-top: 8px; font-size: 12px; color: var(--muted); }
-  details li { list-style: none; padding: 2px 0; font-family: var(--mono); }
-  details ul { margin: 6px 0 0; padding: 0; }
-  .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--jev-dim); border-top-color: var(--jev); border-radius: 50%; animation: rot .8s linear infinite; vertical-align: -2px; margin-right: 8px; }
-
-  button { font: inherit; cursor: pointer; border: 0; border-radius: 12px; }
-  .actions { margin-top: 14px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .cta { font-size: 26px; font-weight: 800; padding: 16px 64px; background: var(--ok); color: #0b0d10; letter-spacing: .05em; animation: pulse 1.8s infinite; min-width: 380px; }
-  .cta:disabled { animation: none; opacity: .6; cursor: default; }
-  .cta kbd { font: 12px var(--mono); padding: 1px 6px; border-radius: 4px; background: rgba(0,0,0,.15); margin-left: 10px; vertical-align: 4px; }
-  .start { font-size: 20px; font-weight: 700; padding: 14px 40px; background: var(--text); color: #0b0d10; }
-  .ghost { background: none; color: var(--muted); text-decoration: underline; font-size: 14px; padding: 4px; }
-  .again { background: #232a33; color: var(--text); font-size: 15px; font-weight: 700; padding: 10px 22px; margin-top: 10px; }
-  .why { text-align: left; margin: 8px auto 0; max-width: 640px; padding: 0 0 0 18px; color: #c7ced8; font-size: 14px; }
-  .why li { margin: 3px 0; }
-  .muted { color: var(--muted); }
-  .simnote { font: 11px var(--mono); color: var(--warn); margin-top: 6px; }
-
-  .done { animation: in .5s ease; }
-  .done .big { font-size: 40px; font-weight: 900; color: var(--ok); letter-spacing: .08em; }
-  .done .check { width: 64px; height: 64px; border-radius: 50%; background: var(--ok); color: #0b0d10; display: grid; place-items: center; font-size: 36px; font-weight: 900; margin: 0 auto 8px; animation: pop .6s cubic-bezier(.2,1.6,.4,1); box-shadow: 0 0 40px rgba(104,211,145,.5); }
-  .done .meta { font: 12px var(--mono); color: var(--muted); margin-top: 6px; }
-  .done .sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px auto 0; max-width: 720px; text-align: left; }
-  .done .sum div { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; color: #c7ced8; }
-  .done .sum b { display: block; color: var(--text); font-size: 15px; margin-bottom: 2px; }
-  .blocked .big { color: var(--bad); }
-
-  @keyframes in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  @keyframes pop { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
-  @keyframes fill { to { transform: none; } }
-  @keyframes rot { to { transform: rotate(360deg); } }
-  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(104,211,145,.55); } 70% { box-shadow: 0 0 0 20px rgba(104,211,145,0); } 100% { box-shadow: 0 0 0 0 rgba(104,211,145,0); } }
-  @media (max-width: 1100px) { body { overflow: auto; } main { grid-template-columns: 1fr; height: auto; } .trace { max-height: 200px; } .room { max-height: 380px; } .decide { grid-template-columns: 1fr; } }
 </style>
 </head>
-<body>
-<header>
-  <div class="brand">PACT</div>
-  <div class="tag">Set the bounds. Let agents make the deal.</div>
-  <div class="chips" id="chips"><span class="chip deal" id="dealId">no deal</span></div>
-</header>
-
+<body class="idle">
+<header><div class="brand">pact</div><div class="tag">Agent commerce.</div><div class="header-end"><button class="header-link" id="homeBtn" hidden>Overview</button><button class="header-link" id="workspaceBtn">Open workspace ↗</button><details class="systems"><summary>Connections</summary><div class="chips" id="chips"><span class="chip deal" id="dealId">No active deal</span></div></details></div></header>
+<div class="landing" id="landingView">
+  <div class="landing-hero"><div class="landing-copy"><div class="eyebrow">Meet Pact</div><h1>Good deals.<br><span>Better boundaries.</span></h1><p>A shopper agent. A merchant agent. An agreement that works for both—with you in control.</p><button class="start" id="enterBtn">Try Pact <span aria-hidden="true">↗</span></button><div class="label2">An interactive demo. No account needed.</div></div>
+  <div class="landing-visual"><div class="visual-halo" aria-hidden="true"></div><svg class="product-art" viewBox="0 0 240 240" role="img" aria-label="Headphones demo illustration"><defs><linearGradient id="landing-band" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#65676a"/><stop offset=".45" stop-color="#202226"/><stop offset="1" stop-color="#42454a"/></linearGradient><linearGradient id="landing-cup" x1="0" x2="1"><stop stop-color="#4d5055"/><stop offset=".35" stop-color="#282a2e"/><stop offset="1" stop-color="#16171a"/></linearGradient></defs><ellipse cx="120" cy="216" rx="70" ry="7" fill="#dce0e6" opacity=".6"/><g transform="rotate(-12 120 120)"><path d="M47 150V104a73 73 0 0 1 146 0v46" fill="none" stroke="url(#landing-band)" stroke-width="17" stroke-linecap="round"/><path d="M54 103a66 66 0 0 1 132 0" fill="none" stroke="#989ba0" stroke-width="2" opacity=".65"/><path d="M48 118v50m144-50v50" stroke="#75787e" stroke-width="8" stroke-linecap="round"/><rect x="30" y="139" width="40" height="64" rx="18" fill="url(#landing-cup)"/><rect x="172" y="139" width="40" height="64" rx="18" fill="url(#landing-cup)"/><rect x="62" y="146" width="13" height="50" rx="6" fill="#161719"/><rect x="167" y="146" width="13" height="50" rx="6" fill="#161719"/><path d="M38 153v34m165-34v34" stroke="#85888e" stroke-width="1.5" opacity=".4"/></g></svg><div class="floating-offer"><span class="offer-icon" aria-hidden="true">✓</span><div><strong>The details, worked out.</strong><small>Within budget. Within policy.</small></div><div class="offer-price">Your call<small>Human approval</small></div></div></div></div>
+  <div class="landing-features"><div class="landing-feature"><div class="num">01 / Intent</div><h2>Start with what matters.</h2><p>Set your budget, preferences, and when your agent should ask.</p></div><div class="landing-feature"><div class="num">02 / Negotiation</div><h2>Let the agents work.</h2><p>They compare offers and negotiate price, delivery, and returns.</p></div><div class="landing-feature"><div class="num">03 / Control</div><h2>Keep the final say.</h2><p>Pact checks the boundaries before an agreement can go ahead.</p></div></div>
+  <div class="landing-footer"><span>Built for agent-to-agent commerce.</span><span>Demo checkout · No real payments</span></div>
+</div>
+<div id="workspaceView" hidden>
+<div class="intro"><h1>Your deal workspace.</h1><p>One request. Two agents. Every boundary respected.</p></div>
 <main>
   <section class="side shopper">
     <h2><span class="dot"></span>Shopper Agent</h2>
-    <div class="sub">Acts for the buyer · @ShopperAgent</div>
+    <div class="sub">Finds the right deal for you.</div>
     <div class="talk">
-      <div class="convo" id="convo"><div class="hint">Tell your agent what you want. Try: “Find me Sony noise-cancelling headphones in black, under 300, by Tuesday.”</div></div>
+      <div class="convo" id="convo"><div class="hint">Have something else in mind? Tell your agent.</div></div>
       <form id="talkForm" autocomplete="off">
         <button type="button" class="mic" id="micBtn" title="Speak (Chrome)" aria-label="Speak your request"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4"/></svg></button>
-        <input id="talkInput" placeholder="Type your request, or use the mic…" />
+        <input id="talkInput" aria-label="Your shopping request" placeholder="Tell your agent what you want…" /><button class="send" type="submit" aria-label="Send request">↑</button>
       </form>
     </div>
     <div class="label" id="memLabel" hidden>Recalled from memory <span class="lock">MOSS</span></div>
     <div class="mems" id="mems"></div>
-    <div class="label">Owner's goals &amp; bounds <span class="lock">PRIVATE</span></div>
-    <dl id="shopperRules"></dl>
-    <div class="label">Agent reasoning <span class="lock">PRIVATE</span></div>
-    <div class="trace" id="shopperTrace"></div>
+    <div class="label">Your boundaries <span class="lock">PRIVATE</span></div>
+    <div class="key-rules" id="shopperKeyRules"></div><details class="rule-details"><summary>Preferences &amp; boundaries</summary><dl id="shopperRules"></dl></details>
+    <details class="reasoning"><summary>Private reasoning</summary><div class="trace" id="shopperTrace"></div></details>
   </section>
 
   <section class="center">
+    <nav class="flow" aria-label="Deal progress" id="flow"><span class="active"><b>1</b> Your request</span><span><b>2</b> Negotiation</span><span><b>3</b> Policy check</span><span><b>4</b> Your approval</span></nav>
+    <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
     <div class="path" id="path"><span class="muted">Negotiation not started</span></div>
     <div class="roomhead"><span id="roomName"># deal room</span><span id="roomMode">shared · auditable</span></div>
-    <div class="room" id="room"></div>
+    <div class="room" id="room" role="log" aria-label="Negotiation timeline"></div>
     <div class="typing" id="typing"></div>
     <div class="stage" id="stage">
-      <div class="k" style="margin-bottom:10px" id="productLine">&nbsp;</div>
-      <button class="start" id="startBtn">Start negotiation</button>
+      <div class="welcome">
+        <svg class="product-art" viewBox="0 0 240 240" role="img" aria-label="Headphones demo illustration"><defs><linearGradient id="band" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#65676a"/><stop offset=".45" stop-color="#202226"/><stop offset="1" stop-color="#42454a"/></linearGradient><linearGradient id="cup" x1="0" x2="1"><stop stop-color="#4d5055"/><stop offset=".35" stop-color="#282a2e"/><stop offset="1" stop-color="#16171a"/></linearGradient></defs><ellipse cx="120" cy="216" rx="70" ry="7" fill="#dce0e6" opacity=".6"/><g transform="rotate(-12 120 120)"><path d="M47 150V104a73 73 0 0 1 146 0v46" fill="none" stroke="url(#band)" stroke-width="17" stroke-linecap="round"/><path d="M54 103a66 66 0 0 1 132 0" fill="none" stroke="#989ba0" stroke-width="2" opacity=".65"/><path d="M48 118v50m144-50v50" stroke="#75787e" stroke-width="8" stroke-linecap="round"/><rect x="30" y="139" width="40" height="64" rx="18" fill="url(#cup)"/><rect x="172" y="139" width="40" height="64" rx="18" fill="url(#cup)"/><rect x="62" y="146" width="13" height="50" rx="6" fill="#161719"/><rect x="167" y="146" width="13" height="50" rx="6" fill="#161719"/><path d="M38 153v34m165-34v34" stroke="#85888e" stroke-width="1.5" opacity=".4"/></g></svg>
+        <h2>A little less back-and-forth.</h2><p>Let your shopper and merchant agents find an offer that works for both of you.</p>
+        <div class="product-line" id="productLine">Loading demo product…</div>
+        <button class="start" id="startBtn">Find a deal</button><div class="label2">Try the preset demo, or enter your own request.</div>
+      </div>
     </div>
   </section>
 
   <section class="side merchant">
     <h2><span class="dot"></span>Merchant Agent</h2>
-    <div class="sub">Acts for the store · @MerchantAgent</div>
-    <div class="label">Merchant rules <span class="lock">PRIVATE</span></div>
-    <dl id="merchantRules"></dl>
-    <div class="label">Agent reasoning &amp; tools <span class="lock">PRIVATE</span></div>
-    <div class="trace" id="merchantTrace"></div>
+    <div class="sub">Protects the store’s boundaries.</div>
+    <div class="agent-note">Convert the sale. Keep the margin.</div>
+
+    <div class="key-rules" id="merchantKeyRules"></div><details class="rule-details"><summary>Inventory &amp; policies</summary><dl id="merchantRules"></dl></details>
+    <details class="reasoning"><summary>Private reasoning &amp; tools</summary><div class="trace" id="merchantTrace"></div></details>
   </section>
 </main>
+</div>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -254,7 +239,27 @@ const money = n => "$" + (Number.isInteger(+n) ? n : (+n).toFixed(2));
 const shipLabel = s => s === "free_next_day" ? "Free next-day" : "Standard shipping";
 const day = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" }) : "—";
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : "";
-const LABEL = { AUTO_APPROVE: "AUTO-APPROVE", HUMAN_APPROVAL_REQUIRED: "HUMAN APPROVAL REQUIRED", REJECT: "REJECT" };
+const LABEL = { AUTO_APPROVE: "Approved by policy", HUMAN_APPROVAL_REQUIRED: "Needs your approval", REJECT: "Outside the boundaries" };
+
+// View navigation is independent from the deal lifecycle.
+function renderView() {
+  const workspace = location.hash === '#workspace';
+  $('landingView').hidden = workspace;
+  $('workspaceView').hidden = !workspace;
+  $('homeBtn').hidden = !workspace;
+  $('workspaceBtn').hidden = workspace;
+  const view = $(workspace ? 'workspaceView' : 'landingView');
+  view.classList.remove('view-enter');
+  requestAnimationFrame(() => view.classList.add('view-enter'));
+  document.title = workspace ? 'Pact — Deal workspace' : 'Pact — Good deals. Better boundaries.';
+  window.scrollTo({top:0, behavior:'instant'});
+}
+function openWorkspace() { location.hash = 'workspace'; }
+$('enterBtn').onclick = openWorkspace;
+$('workspaceBtn').onclick = openWorkspace;
+$('homeBtn').onclick = () => { location.hash = ''; };
+window.addEventListener('hashchange', renderView);
+renderView();
 
 // ---- integration badges ------------------------------------------------------
 function renderChips(list, room) {
@@ -268,7 +273,7 @@ function renderChips(list, room) {
     }
     return `<span class="chip ${mode === "live" ? "live" : "fallback"}" title="${esc(detail)}"><i></i><b>${esc(i.name)}</b>${mode === "live" ? "LIVE" : "SIMULATED"}</span>`;
   });
-  $("chips").innerHTML = `<span class="chip deal" id="dealId">${esc(deal ? "#" + deal.id.toUpperCase() : "no deal")}</span>` + chips.join("");
+  $("chips").innerHTML = `<span class="chip deal" id="dealId">${esc(deal ? "#" + deal.id.toUpperCase() : "No active deal")}</span>` + chips.join("");
 }
 
 function renderRoomMode(room) {
@@ -285,22 +290,24 @@ function renderRoomMode(room) {
 function renderRules(snap, prov = null) {
   const s = snap.shopper, m = snap.merchant;
   const tag = key => prov ? (src => `<span class="src ${src}">${src === "you" ? "YOU" : src === "memory" ? "MEMORY" : "DEFAULT"}</span>`)(prov[key]?.source || "default") : "";
+  const metric = (label, value, key) => `<dl class="key-rule"><dt>${esc(label)}</dt><dd>${esc(value)}</dd>${key ? tag(key) : ''}</dl>`;
+  $('shopperKeyRules').innerHTML = metric('Budget', money(s.max_price), 'max_price') + metric('Ask above', money(s.approval_required_above), 'approval_required_above');
+  $('merchantKeyRules').innerHTML = metric('Margin floor', m.min_margin_pct + '%') + metric('Prioritize', m.overstock.map(cap).join(', ') || '—');
   $("shopperRules").innerHTML = [
-    ["Max price", money(s.max_price), "max_price"],
+
     ["Preferred", cap(s.preferred_variant), "preferred_variant"],
     ["Also OK", s.fallback_variants.map(cap).join(", ") + ` (if ${s.fallback_return_days}-day returns)`, "fallback_variants"],
     ["Deliver by", day(s.delivery_deadline), "delivery_deadline"],
     ["Min returns", s.minimum_return_days + " days", "minimum_return_days"],
-    ["Ask me above", money(s.approval_required_above), "approval_required_above"],
     ...(s.competitor_price ? [["Found elsewhere", `${money(s.competitor_price)} at ${s.competitor_retailer}`, "competitor_price"]] : []),
   ].map(([k, v, key]) => `<dt>${k}</dt><dd>${esc(v)}${tag(key)}</dd>`).join("");
   $("merchantRules").innerHTML = [
     ["List price", money(m.list_price)],
-    ["Min margin", m.min_margin_pct + "%"],
+
     ["Auto-discount cap", m.max_auto_discount_pct + "%"],
     ["Inventory", Object.entries(m.inventory).map(([k, v]) => `${cap(k)} ${v}`).join(" · ")],
     ["Floors", Object.entries(m.variant_floor).map(([k, v]) => `${cap(k)} ≥ ${money(v)}`).join(" · ") || "—"],
-    ["Move", m.overstock.map(cap).join(", ")],
+
     ["Max returns", m.max_return_days + " days"],
   ].map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
 }
@@ -314,6 +321,7 @@ function pushStep(main, sub, cls = "current") {
     `<div class="step ${s.cls}">${esc(s.main)}${s.sub ? `<small>${esc(s.sub)}</small>` : ""}</div>`).join("");
   $("path").innerHTML = html;
   $("path").classList.toggle("long", steps.length > 6);
+  $("path").scrollLeft = $("path").scrollWidth;
 }
 // ---- stage --------------------------------------------------------------------
 function offerHTML(o, heading, savings) {
@@ -325,7 +333,7 @@ function offerHTML(o, heading, savings) {
 function showOffer(o, heading) { $("stage").innerHTML = offerHTML(o, heading); }
 
 function authorityHTML(d) {
-  if (!d) return `<div class="card auth"><h3>Authority check · Jev</h3>
+  if (!d) return `<div class="card auth"><h3>Policy check · Jev</h3>
       <div style="padding:26px 0;text-align:center;color:var(--jev)"><span class="spin"></span>Jev checking authority…</div>
       <div class="label2">Deterministic gate · AUTO_APPROVE / HUMAN_APPROVAL_REQUIRED / REJECT</div></div>`;
   const live = d.source === "jev";
@@ -334,12 +342,12 @@ function authorityHTML(d) {
       ? `<span class="pill fail">FAIL</span>` : `<span class="pill req">APPROVAL REQUIRED</span>`;
   const checks = (d.checks || []).map(c => `<li>${c.ok ? "✓" : "✗"} ${esc(cap(c.side || ""))} · ${esc(c.rule)} — ${esc(c.detail)}</li>`).join("");
   return `<div class="card auth">
-    <h3>Authority check · Jev<span class="src ${live ? "live" : "fallback"}">${live ? "LIVE" : "FALLBACK"}</span></h3>
+    <h3>Policy check · Jev<span class="src ${live ? "live" : "fallback"}">${live ? "LIVE" : "FALLBACK"}</span></h3>
     <div class="row"><span>Merchant rules</span>${d.merchant_policy_ok ? `<span class="pill pass">PASS</span>` : `<span class="pill fail">FAIL</span>`}</div>
     <div class="row"><span>Shopper rules</span>${shopperPill}</div>
     <div class="verdict ${d.decision}"><span>${LABEL[d.decision] || d.decision}</span><span class="verdict-ico">${d.decision === "AUTO_APPROVE" ? '<svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>' : d.decision === "REJECT" ? '<svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>' : '<svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-4 0"/><path d="M14 10V4a2 2 0 0 0-4 0v2"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>'}</span></div>
     <div class="reason">${esc(d.reason)}</div>
-    <div class="label2">${esc(d.source_label || "")}</div>
+    <!-- Source mode is shown in the authority badge; details remain in evaluated rules. -->
     ${checks ? `<details><summary>${(d.checks || []).length} rules evaluated</summary><ul>${checks}</ul></details>` : ""}
   </div>`;
 }
@@ -349,17 +357,18 @@ function showDecision() {
   const t = agreement.terms;
   const canApprove = authority && authority.decision === "HUMAN_APPROVAL_REQUIRED" && deal.status === "awaiting_approval";
   $("stage").innerHTML = `<div class="decide">
-      <div class="card agree">${offerHTML(t, "Agreement ready · both agents signed", agreement.shopper_savings)}
+      <div class="card agree">${offerHTML(t, "Your agreed offer", agreement.shopper_savings)}
         <div class="label2" style="text-align:center">Arrives ${esc(day(t.delivery_date))} · ${esc(deal.id)}</div></div>
       ${authorityHTML(authority)}
     </div>
     <div class="actions">
-      ${canApprove ? `<button class="cta" id="approveBtn">APPROVE ${money(t.price)}<kbd>A</kbd></button>
-        <div class="muted" style="font-size:13px">Your agent paused here: ${esc(authority.reason.toLowerCase())}.</div>` : ""}
-      <button class="ghost" id="whyBtn">Why this deal?</button><div id="whyBox"></div>
+      ${canApprove ? `<button class="cta" id="approveBtn">Approve ${money(t.price)}<kbd>A</kbd></button>
+        <div class="label2">Nothing executes until you approve.</div>` : ""}
+      <button class="ghost" id="transcriptBtn">Review negotiation</button><button class="ghost" id="whyBtn">Why this deal?</button><div id="whyBox"></div>
     </div>`;
   if (canApprove) $("approveBtn").onclick = approve;
   $("whyBtn").onclick = toggleWhy;
+  $("transcriptBtn").onclick = () => { const show = document.body.classList.toggle("review-timeline"); $("transcriptBtn").textContent = show ? "Hide negotiation" : "Review negotiation"; };
 }
 
 function toggleWhy() {
@@ -373,31 +382,32 @@ function showComplete(e) {
   const when = x.approved_at ? new Date(x.approved_at * 1000).toLocaleTimeString() : "";
   $("stage").innerHTML = `<div class="done">
       <div class="check">✓</div>
-      <div class="big">TRANSACTION COMPLETE</div>
+      <div class="big">Deal complete</div>
       <div class="terms"><span>${money(t.price)}</span><span>${cap(t.variant)}</span><span>${shipLabel(t.shipping)}</span><span>${t.return_window_days}-day returns</span></div>
       <div class="meta">order ${esc(x.order_id)} · approved by ${x.approved_by === "human" ? "the shopper's human" : "policy (auto-approve)"} ${when ? "at " + when : ""}</div>
       ${x.simulated ? `<div class="simnote">Checkout &amp; inventory reservation are simulated — no real payment was taken.</div>` : ""}
       <div class="sum">
-        <div><b>Shopper</b>Saved ${money(e.agreement.shopper_savings)} · inside every bound · approved the exception</div>
-        <div><b>Merchant</b>Kept margin above floor · moved overstocked ${esc(t.variant)}</div>
+        <div><b>Shopper</b>Saved ${money(e.agreement.shopper_savings)} · ${x.approved_by === "human" ? "approved by you" : "approved within policy"}</div>
+        <div><b>Merchant</b>${e.authority?.merchant_policy_ok ? "Merchant rules respected" : "Deal executed"} · converted the sale</div>
         <div><b>Jev</b>${esc(LABEL[(e.authority || {}).decision] || "—")} · ${esc((e.authority || {}).source === "jev" ? "live" : "local rules (fallback)")}</div>
       </div>
       <div class="track" id="track"></div>
-      <div class="actions"><button class="ghost" id="whyBtn">Why this deal?</button><div id="whyBox"></div>
-        <button class="again" id="againBtn">↻ Run again</button></div>
+      <div class="actions"><button class="ghost" id="transcriptBtn">Review negotiation</button><button class="ghost" id="whyBtn">Why this deal?</button><div id="whyBox"></div>
+        <button class="again" id="againBtn">Find another deal</button></div>
     </div>`;
   $("whyBtn").onclick = toggleWhy;
-  $("againBtn").onclick = start;
+  $("transcriptBtn").onclick = () => { const show = document.body.classList.toggle("review-timeline"); $("transcriptBtn").textContent = show ? "Hide negotiation" : "Review negotiation"; };
+  $("againBtn").onclick = () => start();
 }
 
 function showBlocked(e) {
   document.body.classList.add("decision");
   $("stage").innerHTML = `<div class="done blocked">
-      <div class="big">DEAL BLOCKED</div>
+      <div class="big">This deal couldn’t proceed</div>
       <div class="reason" style="font-size:16px;margin:8px 0">${esc(e.reason)}</div>
       ${e.authority ? `<div class="decide" style="grid-template-columns:1fr;max-width:520px;margin:0 auto">${authorityHTML(e.authority)}</div>` : ""}
-      <div class="actions"><button class="again" id="againBtn">↻ Run again</button></div></div>`;
-  $("againBtn").onclick = start;
+      <div class="actions"><button class="again" id="againBtn">Find another deal</button></div></div>`;
+  $("againBtn").onclick = () => start();
 }
 
 // ---- events -------------------------------------------------------------------
@@ -407,7 +417,7 @@ function onMessage(m, store = null) {
   const via = deal?.room?.live ? "via BAND" : "local";
   const tag = store ? `<span class="store">${m.sender === "ShopperAgent" ? "→ " : ""}${esc(store)}</span>` : "";
   $("room").insertAdjacentHTML("beforeend",
-    `<div class="msg ${m.sender}"><div class="who"><b>@${m.sender}</b>${tag}<span class="via">${via}</span></div>${text}</div>`);
+    `<div class="msg ${m.sender}"><div class="who"><b>${m.sender === "ShopperAgent" ? "Shopper" : "Merchant"}</b>${tag}<span class="via">${via}</span></div>${text}</div>`);
   $("room").scrollTop = $("room").scrollHeight;
   $("typing").textContent = "";
 
@@ -437,10 +447,11 @@ function onTrace(e) {
 function onPhase(e) {
   if (e.phase !== "negotiating") $("typing").textContent = "";
   if (e.phase === "checking_authority") {
+    progress(2);
     deal.status = "checking_authority";
     agreement = e.agreement;
     pushStep("AGREEMENT", "both signed", "final");
-    pushStep("JEV CHECK", "authority gate", "jev");
+    pushStep("Policy check", "authority gate", "jev");
     showDecision();
   }
 }
@@ -456,20 +467,35 @@ function onAuthority(e) {
 
 function onStatus(e) {
   deal.status = e.status;
+  if (["awaiting_approval", "complete", "failed"].includes(e.status)) progress(3);
   if (e.why) why = e.why;
   if (e.status === "awaiting_exception" && e.exception) { showException(e.exception); return; }
   if (e.status === "awaiting_approval") { agreement = e.agreement; authority = e.authority || authority; showDecision(); }
-  if (e.status === "complete") { pushStep("TRANSACTION COMPLETE", e.execution?.simulated ? "simulated checkout" : "executed", "final"); showComplete(e); }
+  if (e.status === "complete") { pushStep("Deal complete", e.execution?.simulated ? "simulated checkout" : "executed", "final"); showComplete(e); }
   if (e.status === "failed") { pushStep("BLOCKED", "", "bad"); showBlocked(e); }
 }
 
+let starting = false;
+function progress(index) {
+  document.body.classList.toggle('idle', index === 0);
+  document.querySelectorAll('#flow span').forEach((el,i) => { el.classList.toggle('active',i <= index); if(i === index) el.setAttribute('aria-current','step'); else el.removeAttribute('aria-current'); });
+}
+function notice(text = '') { $('notice').textContent = text; $('notice').hidden = !text; }
+async function request(url, options) {
+  const response = await fetch(url, options);
+  if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(typeof body.detail === 'string' ? body.detail : 'Request failed. Please try again.'); }
+  return response;
+}
 async function start(intakeId = null) {
+  if (starting || (deal && !['complete','failed'].includes(deal.status) && source)) return;
+  starting = true; notice(); progress(1);
+  try {
   if (source) source.close();
-  document.body.classList.remove("decision");
+  document.body.classList.remove("decision", "review-timeline");
   agreement = authority = null; why = []; steps = []; askedOnce = false; tracking = {};
   ["room", "shopperTrace", "merchantTrace"].forEach(id => $(id).innerHTML = "");
   $("stage").innerHTML = `<div class="k"><span class="spin"></span>Opening deal room…</div>`;
-  const res = await fetch(`/api/deals?pace=${pace}&id=${encodeURIComponent(dealParam)}` +
+  const res = await request(`/api/deals?pace=${pace}&id=${encodeURIComponent(dealParam)}` +
                           (intakeId ? `&intake=${intakeId}` : "") + `&prefer=${prefer}`, { method: "POST" });
   deal = await res.json();
   listPrice = deal.product.list_price;
@@ -479,6 +505,8 @@ async function start(intakeId = null) {
   pushStep(money(listPrice), "list price", "struck");
   $("stage").innerHTML = `<div class="k">Agents negotiating in ${esc(deal.room?.title || deal.id)}…</div>`;
   source = new EventSource(`/api/deals/${deal.id}/events`);
+  source.onerror = () => notice('Connection interrupted. Reconnecting to the deal room…');
+  source.onopen = () => notice();
   source.onmessage = ev => {
     const e = JSON.parse(ev.data);
     if (e.type === "message") onMessage(e.message, e.merchant_name);
@@ -494,12 +522,17 @@ async function start(intakeId = null) {
     else if (e.type === "memory") agentSays(`Saved to memory: ${e.text}`, false);
     else if (e.type === "discovery" && e.chosen) pushStep(`FOUND @${e.chosen.name}`, `BAND directory · ${e.candidates.length} merchants`);
   };
+  } catch (error) {
+    deal = null; source = null; notice(error.message); progress(0);
+    $('stage').innerHTML = '<div class="k">Could not open the deal room</div><button class="again" id="retryBtn">Try again</button>';
+    $('retryBtn').onclick = () => start(intakeId);
+  } finally { starting = false; }
 }
 
 // ---- talk to the shopper agent (Moss memory; browser speech in/out) ----------
 let intake = null;
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-const speakOn = new URLSearchParams(location.search).get("voice") !== "0";
+const speakOn = new URLSearchParams(location.search).get("voice") === "1";
 function bubble(cls, text) {
   const c = $("convo"); c.querySelector(".hint")?.remove();
   c.insertAdjacentHTML("beforeend", `<div class="b ${cls}">${esc(text)}</div>`); c.scrollTop = c.scrollHeight;
@@ -523,7 +556,7 @@ function renderIntake(v) {
   const live = v.memory?.mode === "live";
   $("mems").innerHTML = v.recalled.map(r => `<div>“${esc(r.text)}”<span class="ms">${live ? r.ms + " ms" : "local"}</span></div>`).join("");
   if (v.options?.length) renderOptions(v);
-  else if (v.product) $("productLine").textContent = `${v.product.name}${v.product.carried ? "" : " — not sold by reachable merchants"}`;
+  else if (v.product && $("productLine")) $("productLine").textContent = `${v.product.name}${v.product.carried ? "" : " — not sold by reachable merchants"}`;
 
 }
 const PREF_LABEL = { best: "Best match", cheapest: "Cheapest", fastest: "Fastest delivery" };
@@ -616,8 +649,10 @@ async function choose(productId, maxPrice) {
 async function say(text) {
   text = text.trim(); if (!text) return;
   bubble("you", text);
-  const r = await fetch("/api/intake", { method: "POST", headers: { "Content-Type": "application/json" },
+  let r;
+  try { r = await request("/api/intake", { method: "POST", headers: { "Content-Type": "application/json" },
                                          body: JSON.stringify({ text, intake_id: intake?.intake_id }) });
+  } catch (error) { notice(error.message); return; }
   if (!r.ok) { agentSays("Sorry — I couldn't process that.", false); return; }
   intake = await r.json();
   agentSays(intake.reply);
@@ -637,12 +672,13 @@ async function approve() {
   const b = $("approveBtn");
   if (!b || b.disabled) return;
   b.disabled = true; b.textContent = "Approving…";
-  const r = await fetch(`/api/deals/${deal.id}/approve`, { method: "POST" });
-  if (!r.ok) { b.textContent = "Approval failed"; }
+  try {
+    await request(`/api/deals/${deal.id}/approve`, { method: 'POST' }); notice();
+  } catch (error) { b.disabled = false; b.textContent = `Retry approval ${money(agreement.terms.price)}`; notice(error.message); }
 }
 
 document.addEventListener("keydown", e => {
-  if (e.target.closest?.("input, textarea")) return;  // typing to the agent
+  if ($("workspaceView").hidden || e.target.closest?.("input, textarea, button, summary")) return;  // typing to the agent
   if (e.key === "a" && $("approveBtn")) approve();
   if (e.key === "Enter" && $("startBtn")) start(intake?.product?.carried ? intake.intake_id : null);
 });
