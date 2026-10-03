@@ -155,3 +155,55 @@ async def evaluate(a: Agreement, s: ShopperState, m: MerchantState, transcript: 
         final, reason = "HUMAN_APPROVAL_REQUIRED", f"Jev confidence {confidence:.2f} below {MIN_CONFIDENCE}"
     return rules.model_copy(update={"decision": final, "reason": reason, "source": "jev",
                                     "confidence": round(confidence, 2), "risk": round(risk, 2)})
+
+
+# ---------------------------------------------------------------- near-miss escalation
+WALK_ABOVE_PCT = 10.0  # code rule: never bother the human beyond this
+ASK_UNDER_PCT = 3.0  # code rule: always ask when it's this close
+
+
+async def near_miss_decision(nm: dict, shopper: ShopperState, merchant: str, transcript: list[str]) -> dict:
+    """No offer fits. Should the shopper agent ask its human, or walk away? Code decides the
+    extremes; Jev decides the grey zone; low confidence asks (asking is the safe side)."""
+    o, pct = nm["offer"], nm["over_pct"]
+    if pct > WALK_ABOVE_PCT:
+        return {"decision": "WALK_AWAY", "source": "rules",
+                "reason": f"{pct}% over budget — beyond the {WALK_ABOVE_PCT:.0f}% a human would consider"}
+    if pct <= ASK_UNDER_PCT:
+        return {"decision": "ASK_HUMAN", "source": "rules", "reason": f"only {pct}% over budget"}
+    key = os.environ.get("TYPESAFE_API_KEY") or os.environ.get("JEV_API_KEY")
+    fallback = {"decision": "ASK_HUMAN" if pct <= 5 else "WALK_AWAY", "source": "local-rules",
+                "reason": f"{pct}% over budget (Jev unavailable — local rule: ask up to 5%)"}
+    if not key:
+        return fallback
+    state = {"offer": {"merchant": merchant, "price": o.price, "variant": o.variant, "shipping": o.shipping,
+                       "delivery_date": o.delivery_date.isoformat(), "return_window_days": o.return_window_days},
+             "shopper": {"budget": shopper.max_price, "over_by_usd": nm["over_by"], "over_budget_pct": pct,
+                         "preferred_variant": shopper.preferred_variant,
+                         "asks_before_spending_over": shopper.approval_required_above,
+                         "minimum_return_days": shopper.minimum_return_days},
+             "transcript": transcript[-6:]}
+    try:
+        async with httpx.AsyncClient(timeout=15) as http:
+            base = os.environ.get("JEV_BASE_URL", JEV_BASE_URL).rstrip("/")
+            res = await http.post(f"{base}/v1/systemone", headers={"Authorization": f"Bearer {key}"}, json={
+                "model": os.environ.get("JEV_MODEL", "jev-latest"), "state": state, "questions": {"next": {
+                    "type": "choice",
+                    "instructions": ("No offer fits the shopper's budget. The best offer is in `offer`; the gap is in "
+                                     "`shopper`. Should the shopper's agent interrupt its human to ask whether to "
+                                     "accept, or walk away without bothering them?"),
+                    "criteria": {
+                        "ASK_HUMAN": "The overage is small relative to the budget and the offer is otherwise a good "
+                                     "fit (right colour, on time, good returns); a reasonable person would want to decide.",
+                        "WALK_AWAY": "The overage is too large or the offer is a poor fit; asking would waste the "
+                                     "human's attention.",
+                    }}}})
+            res.raise_for_status()
+            ans = res.json()["answers"]["next"]
+    except (httpx.HTTPError, KeyError, ValueError) as e:
+        return {**fallback, "reason": f"{pct}% over budget (Jev unavailable: {type(e).__name__}; local rule)"}
+    conf = ans.get("confidence", 0.0)
+    decision = ans["choice"] if conf >= MIN_CONFIDENCE else "ASK_HUMAN"
+    reason = (f"{pct}% over budget — Jev: {ans['choice']} (confidence {conf:.2f})"
+              + ("" if conf >= MIN_CONFIDENCE else "; low confidence, so asking"))
+    return {"decision": decision, "source": "jev", "reason": reason, "confidence": round(conf, 2)}

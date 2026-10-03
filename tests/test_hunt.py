@@ -42,3 +42,33 @@ async def test_hunt_fails_cleanly_when_no_merchant_fits():
     assert h.status == "failed" and h.winner is None and len(h.quotes) == 2
     with pytest.raises(ValueError):
         h.approve()
+
+
+async def _near_miss_hunt(monkeypatch, budget):
+    from pact.scenario import ShopperState
+    s = ShopperState(max_price=budget, target_price=int(budget * 0.93))
+    h = Hunt(pace=0, shopper_state=s)
+    await h.setup()
+    await h.run()
+    for _ in range(500):
+        if h.status in ("awaiting_exception", "failed"):
+            break
+        await asyncio.sleep(0.01)
+    return h
+
+
+async def test_near_miss_is_put_to_the_human_and_can_be_accepted(monkeypatch):
+    h = await _near_miss_hunt(monkeypatch, 290)  # both stores land at $299.99: 3.4% over -> grey zone
+    assert h.status == "awaiting_exception"
+    ex = next(e for e in h.events if e["type"] == "status" and e["status"] == "awaiting_exception")["exception"]
+    assert ex["over_by"] == 9.99 and ex["decision"]["decision"] == "ASK_HUMAN"  # local rule: ask up to 5%
+    h.resolve_exception(True)
+    await settle(h)
+    assert h.status == "awaiting_approval" and h.agreement.terms.price == 299.99
+    assert any("approved going" in w for w in h.why())
+
+
+async def test_far_over_budget_walks_away_without_asking(monkeypatch):
+    h = await _near_miss_hunt(monkeypatch, 250)  # $299.99 is 20% over -> code rule: walk away
+    assert h.status == "failed" and not any(e["type"] == "status" and e["status"] == "awaiting_exception"
+                                            for e in h.events)

@@ -223,3 +223,15 @@ def finalize(s: ShopperState, transaction_id: str, terms: Offer, list_price: flo
         transaction_id=transaction_id, terms=terms, list_price=list_price,
         shopper_savings=round(list_price - terms.price, 2), human_approval_required=needs_human,
     ), notes
+
+
+def near_miss(s: ShopperState, c: Counteroffer) -> dict | None:
+    """The best offer that misses the shopper's boundaries only on price (right colour, on time)."""
+    acceptable = [s.preferred_variant, *s.fallback_variants]
+    cands = [o for o in c.offers if o.variant in acceptable and o.delivery_date <= s.delivery_deadline
+             and o.price > s.max_price]
+    if not cands:
+        return None
+    o = min(cands, key=lambda x: (x.price, x.variant != s.preferred_variant))
+    over = round(o.price - s.max_price, 2)
+    return {"offer": o, "over_by": over, "over_pct": round(over / s.max_price * 100, 1), "budget": s.max_price}

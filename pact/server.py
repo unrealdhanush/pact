@@ -157,6 +157,16 @@ async def deal_events(deal_id: str):
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+@app.post("/api/deals/{deal_id}/exception")
+async def answer_exception(deal_id: str, body: dict):
+    """The human answers an over-budget offer their agent escalated: {"accept": true|false}."""
+    try:
+        _get(deal_id).resolve_exception(bool(body.get("accept")))
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return {"ok": True}
+
+
 @app.post("/api/deals/{deal_id}/approve")
 async def approve(deal_id: str):  # async: Deal.approve schedules BAND events on the running loop
     try:

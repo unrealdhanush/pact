@@ -446,6 +446,7 @@ function onAuthority(e) {
 function onStatus(e) {
   deal.status = e.status;
   if (e.why) why = e.why;
+  if (e.status === "awaiting_exception" && e.exception) { showException(e.exception); return; }
   if (e.status === "awaiting_approval") { agreement = e.agreement; authority = e.authority || authority; showDecision(); }
   if (e.status === "complete") { pushStep("TRANSACTION COMPLETE", e.execution?.simulated ? "simulated checkout" : "executed", "final"); showComplete(e); }
   if (e.status === "failed") { pushStep("BLOCKED", "", "bad"); showBlocked(e); }
@@ -471,6 +472,8 @@ async function start(intakeId = null) {
     const e = JSON.parse(ev.data);
     if (e.type === "message") onMessage(e.message, e.merchant_name);
     else if (e.type === "quotes") onQuotes(e);
+    else if (e.type === "near_miss" && e.decision?.decision === "WALK_AWAY")
+      $("room").insertAdjacentHTML("beforeend", `<div class="msg system">${esc(e.merchant_name)}: best offer ${money(e.offer.price)} is ${money(e.over_by)} over budget → walk away (${esc(e.decision.reason)})</div>`);
     else if (e.type === "trace") onTrace(e);
     else if (e.type === "phase") onPhase(e);
     else if (e.type === "authority") onAuthority(e);
@@ -513,6 +516,22 @@ function renderIntake(v) {
 }
 const PREF_LABEL = { best: "Best match", cheapest: "Cheapest", fastest: "Fastest delivery" };
 let prefer = "best", sortBy = "relevance";
+function showException(x) {
+  const o = x.offer, d = x.decision || {};
+  pushStep("OVER BUDGET", `+${money(x.over_by)} · Jev: ask you`, "jev");
+  $("stage").innerHTML = `<div class="k">Your agent needs you</div>
+    <div style="font-size:20px;font-weight:700;margin:8px 0 4px">${esc(x.merchant_name)} offers ${money(o.price)} · ${esc(cap(o.variant))}</div>
+    <div class="sub" style="padding:0">${money(x.over_by)} (${x.over_pct}%) over your ${money(x.budget)} budget ·
+      ${o.shipping === "free_next_day" ? "free next-day" : "standard"} (${day(o.delivery_date)}) · ${o.return_window_days}-day returns</div>
+    <div class="sub" style="padding:6px 0 12px">${esc(d.source === "jev" ? "Jev" : "Policy")}: ${esc(d.reason || "")}</div>
+    <button class="start" id="excYes">Accept ${money(o.price)}</button>
+    <div><button class="ghost" id="excNo" style="margin-top:10px">Walk away</button></div>`;
+  const answer = accept => fetch(`/api/deals/${deal.id}/exception`, { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accept }) })
+    .then(() => { $("stage").innerHTML = `<div class="k"><span class="spin"></span>${accept ? "Telling the merchant…" : "Walking away…"}</div>`; });
+  $("excYes").onclick = () => answer(true);
+  $("excNo").onclick = () => answer(false);
+}
 function onQuotes(e) {
   const rows = e.quotes.map(q => q.failed
     ? `<tr><td>${esc(q.name)}</td><td colspan="3">no deal · ${esc(q.failed)}</td></tr>`

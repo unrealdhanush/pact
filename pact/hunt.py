@@ -22,9 +22,9 @@ from .scenario import ShopperState
 log = logging.getLogger("pact.hunt")
 
 PREFERENCES = ("best", "cheapest", "fastest")
-CHILD_ALWAYS = {"message", "trace", "room", "memory"}  # forwarded from every room
+CHILD_ALWAYS = {"message", "trace", "room", "memory", "near_miss"}  # forwarded from every room
 CHILD_WINNER = {"phase", "authority", "status"}  # forwarded only from the winning room
-NEGOTIATION_TIMEOUT_S = 180
+NEGOTIATION_TIMEOUT_S = 90
 
 
 def rank_key(preference: str, shopper: ShopperState, deal: Deal):
@@ -51,6 +51,7 @@ class Hunt:
         self.winner: Deal | None = None
         self.quotes: list[dict] = []
         self.failure: str | None = None
+        self.pending: Deal | None = None  # deal whose over-budget offer is waiting on the human
         self.events: list[dict] = []
         self._queues: set[asyncio.Queue] = set()
         self._tasks: set[asyncio.Task] = set()
@@ -61,6 +62,8 @@ class Hunt:
     def status(self) -> str:
         if self.failure:
             return "failed"
+        if self.pending is not None:
+            return "awaiting_exception"
         return self.winner.status if self.winner else "negotiating"
 
     @property
@@ -197,6 +200,24 @@ class Hunt:
                 q.update(failed=d.failure or "no agreement in time")
             self.quotes.append(q)
         if not agreed:
+            waiting = [d for d in self.deals.values() if d.exception and d._exception_future
+                       and not d._exception_future.done()]
+            if waiting:  # nothing fits, but Jev said a near miss is worth the human's attention
+                best = min(waiting, key=lambda d: (d.exception["over_by"],
+                                                   d.exception["offer"]["variant"] != self.shopper_state.preferred_variant))
+                for d in waiting:
+                    if d is not best:
+                        d.resolve_exception(False)
+                for q in self.quotes:
+                    if q["merchant"] == best.merchant_id:
+                        q.update(over_budget=best.exception)
+                self.pending = self.winner = best
+                self.room = best.room
+                best.hold_gate = False  # if the human accepts, its agreement goes straight to the gate
+                self.emit("quotes", quotes=self.quotes, winner=None, preference=self.preference)
+                self.emit("phase", phase="awaiting_exception")
+                self.emit("status", status="awaiting_exception", exception=best.exception)
+                return
             self.failure = "No merchant could meet your boundaries — your agent walked away from every offer"
             self.emit("quotes", quotes=self.quotes, winner=None, preference=self.preference)
             self.emit("phase", phase="failed")
@@ -216,6 +237,21 @@ class Hunt:
                 continue
             self._spawn(self._decline(d))
         win.release_gate()  # Jev → human approval or auto-execute, streamed via the winner's events
+
+    def resolve_exception(self, accept: bool) -> None:
+        if self.pending is None:
+            raise ValueError("No over-budget offer is waiting for an answer")
+        deal, self.pending = self.pending, None
+        deal.resolve_exception(accept)
+        if not accept:
+            self.failure = "You declined the over-budget offer — your agent walked away"
+            self.emit("phase", phase="failed")
+            self.emit("status", status="failed", reason=self.failure)
+        else:
+            self.emit("phase", phase="negotiating")
+            for d in self.deals.values():
+                if d is not deal:
+                    self._spawn(self._decline(d))
 
     async def _decline(self, deal: Deal) -> None:
         if deal.room is None:

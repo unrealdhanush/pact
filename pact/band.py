@@ -78,8 +78,10 @@ async def urllib_request(method: str, url: str, key: str, body: dict | None) -> 
         except urllib.error.HTTPError as e:
             raise BandError(f"{method} {urllib.parse.urlparse(url).path} → {e.code} "
                             f"{e.read()[:300].decode(errors='replace')}") from None
-        except urllib.error.URLError as e:
-            raise BandError(f"{method} {url} unreachable: {e.reason}") from None
+        except (TimeoutError, OSError) as e:  # read timeouts aren't URLError; degrade like any BAND failure
+            if isinstance(e, urllib.error.URLError):
+                raise BandError(f"{method} {url} unreachable: {e.reason}") from None
+            raise BandError(f"{method} {urllib.parse.urlparse(url).path} timed out ({type(e).__name__})") from None
         return json.loads(raw) if raw else {}
     return await asyncio.to_thread(call)
 

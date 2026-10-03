@@ -7,7 +7,7 @@ import time
 from dataclasses import asdict
 from typing import Literal
 
-from . import discovery, gate
+from . import discovery, gate, jev
 from .agents.merchant import MerchantAgent
 from .agents.shopper import ShopperAgent
 from .agents.zoowork_merchant import ZooWorkMerchantAgent
@@ -21,7 +21,7 @@ from .zoowork import load_agent_id
 
 log = logging.getLogger("pact.deal")
 
-Status = Literal["negotiating", "awaiting_approval", "complete", "failed"]
+Status = Literal["negotiating", "awaiting_exception", "awaiting_approval", "complete", "failed"]
 
 
 class Deal:
@@ -41,7 +41,9 @@ class Deal:
         self.merchant_state = scenario.merchant_state(product_id, merchant_id)
         self.discover = discover
         self.hold_gate = hold_gate  # a Hunt compares agreements first, then releases the winner's gate
-        self.agreed = asyncio.Event()
+        self.agreed = asyncio.Event()  # set when this negotiation settles: agreement, failure or a pending exception
+        self.exception: dict | None = None  # over-budget offer waiting on the human
+        self._exception_future: asyncio.Future | None = None
         self.agreement: Agreement | None = None
         self.authority: dict | None = None
         self.execution: dict | None = None
@@ -111,6 +113,8 @@ class Deal:
         self.shopper = ShopperAgent(self.room, self._trace, self.shopper_state, self.product,
                                     on_agreement=self._on_agreement, pace=self.pace)
         self.shopper.comparing = self.hold_gate
+        self.shopper.on_near_miss = self._near_miss
+        self.shopper.on_human_exception = self._human_exception
         zoowork_id = (load_agent_id() if os.environ.get("PACT_MERCHANT", "zoowork") == "zoowork"
                       and self.merchant_info["runtime"] == "zoowork" else None)
         if zoowork_id:  # ZooWork runs the merchant's reasoning; falls back to local logic per turn on failure
@@ -158,6 +162,39 @@ class Deal:
             self._set_phase("agreed", agreement=agreement.model_dump(mode="json"))
             return None
         return self.release_gate()
+
+    async def _near_miss(self, nm: dict) -> str:
+        """No offer fits: Jev (inside code rules) decides whether to ask the human or walk away."""
+        transcript = [f"{m.sender}: {m.text}" for m in self.room.history]
+        d = await jev.near_miss_decision(nm, self.shopper_state, self.merchant_info["name"], transcript)
+        o = nm["offer"]
+        self.exception = {"merchant": self.merchant_id, "merchant_name": self.merchant_info["name"],
+                          "offer": o.model_dump(mode="json"), "over_by": nm["over_by"], "over_pct": nm["over_pct"],
+                          "budget": nm["budget"], "decision": d}
+        self._trace("shopper", "think", f"No offer fits. Best: {self.merchant_info['name']} {money(o.price)} "
+                    f"{o.variant}, {money(nm['over_by'])} over → {d['decision']} ({d['source']}): {d['reason']}")
+        self.emit("near_miss", **self.exception)
+        if d["decision"] != "ASK_HUMAN":
+            self.exception = None
+        return "ask" if d["decision"] == "ASK_HUMAN" else "walk"
+
+    async def _human_exception(self, nm: dict) -> bool:
+        self._exception_future = asyncio.get_running_loop().create_future()
+        if self.hold_gate:
+            self.agreed.set()  # let the Hunt decide whether this is the offer to put to the human
+        else:
+            self.status = "awaiting_exception"
+            self._set_phase("awaiting_exception")
+            self.emit("status", status=self.status, exception=self.exception)
+        return await self._exception_future
+
+    def resolve_exception(self, accept: bool) -> None:
+        if self._exception_future is None or self._exception_future.done():
+            raise ValueError("No over-budget offer is waiting for an answer")
+        self.status = "negotiating"
+        if accept:
+            self._set_phase("negotiating")
+        self._exception_future.set_result(accept)
 
     def release_gate(self) -> asyncio.Task:
         agreement = self.agreement

@@ -128,10 +128,14 @@ class Intake:
             # top 3 the merchant can actually negotiate, best match first; default selection = first
             carried = [o for o in self.options if o["carried"]][:3]
             self.options = carried + [o for o in self.options if not o["carried"]][:1]
-            if carried:  # default to the best match that can plausibly fit the budget
+            if carried:
+                # A product the human named (brand or model) wins; otherwise the best match that can
+                # plausibly fit the budget.
+                said = set(re.findall(r"[a-z0-9]+", text.lower()))
+                named = [o for o in carried if set(re.findall(r"[a-z0-9]+", o["name"].lower())) & said - {"headphones"}]
                 budget = self.fields["max_price"].value if "max_price" in self.fields else None
                 fits = [o for o in carried if budget is None or o.get("list_price", 0) * 0.9 <= budget]
-                self.product = (fits or carried)[0]
+                self.product = (named or fits or carried)[0]
             elif self.options:
                 self.product = self.options[0]
 

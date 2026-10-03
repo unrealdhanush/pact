@@ -20,6 +20,8 @@ class ShopperAgent(Agent):
         self.state = state
         self.product = product
         self.on_agreement = on_agreement
+        self.on_near_miss = None  # async (near_miss) -> "ask" | "walk"   (set by the Deal; Jev decides)
+        self.on_human_exception = None  # async (near_miss) -> bool        (the human's answer)
 
     async def start(self) -> None:
         s = self.state
@@ -57,6 +59,14 @@ class ShopperAgent(Agent):
             await self.pause(0.5)
 
         if isinstance(result, Rejection):
+            nm = engine.near_miss(self.state, c)
+            if nm and self.on_near_miss and await self.on_near_miss(nm) == "ask":
+                await self.room.post(self.name, f"@{MERCHANT} That's {money(nm['over_by'])} over my customer's "
+                                                f"budget. Let me check with them before I answer.", None, [MERCHANT])
+                if await self.on_human_exception(nm):
+                    await self._accept_over_budget(nm)
+                    return
+                self.think("Human declined the over-budget offer")
             await self.room.post(self.name, f"@{MERCHANT} None of those work for my customer. Passing.",
                                  result, [MERCHANT])
             return
@@ -75,6 +85,19 @@ class ShopperAgent(Agent):
         else:
             text = f"@{MERCHANT} {lead} We'll take {o.variant} at {money(o.price)} as offered."
         await self.room.post(self.name, text.replace("  ", " "), result, [MERCHANT])
+
+    async def _accept_over_budget(self, nm: dict) -> None:
+        o = nm["offer"]
+        self.state.max_price = o.price  # the human raised the ceiling for this deal only
+        self.reasons.append(f"You approved going {money(nm['over_by'])} over budget when your agent asked")
+        needs_returns = (o.variant != self.state.preferred_variant
+                         and o.return_window_days < self.state.fallback_return_days)
+        conditions = {"return_window_days": self.state.fallback_return_days} if needs_returns else {}
+        text = (f"@{MERCHANT} My customer approved going over budget. We'll take {o.variant} at {money(o.price)}"
+                + (f" if the return window is extended to {self.state.fallback_return_days} days." if needs_returns
+                   else " as offered."))
+        await self.room.post(self.name, text,
+                             ConditionalAccept(transaction_id=self.room.id, offer=o, conditions=conditions), [MERCHANT])
 
     async def _on_accept(self, a: MerchantAccept) -> None:
         self.think("Verifying final terms")
