@@ -25,8 +25,8 @@
       }
     ],
     "source": "tavily",
-    "checked_at": "2026-10-03T23:02:11+00:00",
-    "ms": 5988
+    "checked_at": "2026-10-03T23:04:41+00:00",
+    "ms": 455
   },
   "sennheiser-m4": {
     "product": "Sennheiser Momentum 4",
@@ -34,7 +34,7 @@
       {
         "retailer": "Best Buy",
         "domain": "bestbuy.com",
-        "price": 199.99,
+        "price": 134.99,
         "title": "Sennheiser MOMENTUM 4 Wireless Adaptive Noise ...",
         "url": "https://www.bestbuy.com/product/sennheiser-momentum-4-wireless-adaptive-noise-canceling-over-the-ear-headphones-denim/J3GW2LH65F"
       },
@@ -54,8 +54,8 @@
       }
     ],
     "source": "tavily",
-    "checked_at": "2026-10-03T21:13:43+00:00",
-    "ms": 5129
+    "checked_at": "2026-10-03T23:07:15+00:00",
+    "ms": 2801
   },
   "bose-qc-ultra": {
     "product": "Bose QuietComfort Ultra (2nd Gen)",
@@ -69,7 +69,7 @@
       }
     ],
     "source": "tavily",
-    "checked_at": "2026-10-03T22:37:37+00:00",
-    "ms": 7164
+    "checked_at": "2026-10-03T23:06:55+00:00",
+    "ms": 586
   }
 }
