@@ -123,6 +123,7 @@ class Hunt:
             cfg = await bootstrap_agents()
         except Exception as e:  # noqa: BLE001
             log.warning("BAND bootstrap failed: %s", e)
+        await self._scan_market()  # the shopper checks the open web before contacting any merchant agent
         merchants = await self._discover(cfg)
         for m in merchants:
             info = scenario.MERCHANTS[m]
@@ -138,6 +139,25 @@ class Hunt:
         await asyncio.gather(*(d.setup() for d in self.deals.values()))
         for m, d in self.deals.items():
             self._spawn(self._forward(m, d))
+
+    async def _scan_market(self) -> None:
+        """Live prices across major retailers (Tavily) — the shopper's market context for the negotiation."""
+        from .tavily import market_prices
+        p = self.product
+        self.emit("trace", side="shopper", kind="think", text=f"Checking live prices for the {p.name} across the web…")
+        try:
+            m = await asyncio.wait_for(market_prices(self.product_id, p.name, p.search, p.match, p.list_price), 12)
+        except Exception as e:  # noqa: BLE001 - market context is best-effort
+            self.emit("trace", side="shopper", kind="think", text=f"Web prices unavailable ({type(e).__name__})")
+            return
+        for l in m["listings"]:
+            self.emit("trace", side="shopper", kind="tool", text=f"tavily_search → {l['retailer']} {money(l['price'])} (static price)")
+        if m["listings"]:
+            low = m["listings"][0]
+            self.emit("trace", side="shopper", kind="think",
+                      text=f"Lowest on the web: {money(low['price'])} at {low['retailer']}. None of these retailers run "
+                           f"an agent, so I can't negotiate with them — looking for merchant agents that can.")
+        self.emit("market", **m)
 
     async def _discover(self, cfg) -> list[str]:
         """Find merchant agents on BAND that sell the product; fall back to the known list."""

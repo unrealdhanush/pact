@@ -521,6 +521,7 @@ async function start(intakeId = null) {
     const e = JSON.parse(ev.data);
     if (e.type === "message") onMessage(e.message, e.merchant_name);
     else if (e.type === "quotes") onQuotes(e);
+    else if (e.type === "market") onMarket(e);
     else if (e.type === "tracking") onTracking(e);
     else if (e.type === "near_miss" && e.decision?.decision === "WALK_AWAY")
       $("room").insertAdjacentHTML("beforeend", `<div class="msg system">${esc(e.merchant_name)}: best offer ${money(e.offer.price)} is ${money(e.over_by)} over budget → walk away (${esc(e.decision.reason)})</div>`);
@@ -530,7 +531,9 @@ async function start(intakeId = null) {
     else if (e.type === "room") { deal.room = e.room; renderRoomMode(e.room); }
     else if (e.type === "status") onStatus(e);
     else if (e.type === "memory") agentSays(`Saved to memory: ${e.text}`, false);
-    else if (e.type === "discovery" && e.chosen) pushStep(`FOUND @${e.chosen.name}`, `BAND directory · ${e.candidates.length} merchants`);
+    else if (e.type === "discovery" && (e.chosen_all?.length || e.chosen)) pushStep(
+      e.chosen_all?.length > 1 ? `FOUND ${e.chosen_all.length} AGENTS` : `FOUND @${(e.chosen_all || [e.chosen.name])[0]}`,
+      `BAND directory · of ${e.candidates.length} merchants`);
   };
   } catch (error) {
     deal = null; source = null; notice(error.message); progress(0);
@@ -650,6 +653,16 @@ function renderOptions(v) {
   loadMarket(sel);
   document.querySelectorAll("[data-sort]").forEach(b => b.onclick = () => { sortBy = b.dataset.sort; renderOptions(intake); });
   document.querySelectorAll("[data-pref]").forEach(b => b.onclick = () => { prefer = b.dataset.pref; renderOptions(intake); });
+}
+function onMarket(m) {
+  if (!m.listings?.length) return;
+  const how = m.source === "tavily" ? "live · Tavily" : m.source === "cache" ? "cached" : m.source;
+  const rows = m.listings.map(l => `<tr><td>${esc(l.retailer)}</td><td>${money(l.price)}</td><td>static price · no agent</td></tr>`).join("");
+  $("room").insertAdjacentHTML("beforeend", `<div class="msg system">Shopper checked the web first (${esc(how)}) —
+    lowest ${money(m.listings[0].price)} at ${esc(m.listings[0].retailer)}. No retailer runs an agent, so it looks for ones that do.
+    <table class="quotes">${rows}</table></div>`);
+  $("room").scrollTop = $("room").scrollHeight;
+  pushStep(`WEB FROM ${money(m.listings[0].price)}`, `${m.listings.length} retailers · Tavily`);
 }
 const marketCache = {};
 async function loadMarket(pid) {

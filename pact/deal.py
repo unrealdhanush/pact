@@ -1,5 +1,6 @@
 """One negotiation: room + both agents + authority gate + an event log the UI streams."""
 import asyncio
+import dataclasses
 import logging
 import os
 import random
@@ -39,6 +40,8 @@ class Deal:
         self.merchant_id = merchant_id
         self.merchant_info = scenario.MERCHANTS[merchant_id]
         self.merchant_state = scenario.merchant_state(product_id, merchant_id)
+        # this merchant's own shelf price is the reference for the deal (savings, opening offer)
+        self.product = dataclasses.replace(self.product, list_price=self.merchant_state.list_price)
         self.discover = discover
         self.hold_gate = hold_gate  # a Hunt compares agreements first, then releases the winner's gate
         self.agreed = asyncio.Event()  # set when this negotiation settles: agreement, failure or a pending exception
