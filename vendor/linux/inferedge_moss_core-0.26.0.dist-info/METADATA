@@ -1,0 +1,61 @@
+Metadata-Version: 2.4
+Name: inferedge-moss-core
+Version: 0.26.0
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Programming Language :: Rust
+Classifier: License :: Other/Proprietary License
+Classifier: Operating System :: OS Independent
+License-File: LICENSE
+Summary: Proprietary core index logic for Moss
+Author: InferEdge, Inc.
+License: SEE LICENSE IN LICENSE
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM
+Project-URL: Homepage, https://github.com/InferEdge-Inc/moss
+Project-URL: Issues, https://github.com/InferEdge-Inc/moss/issues
+
+# InferEdge MOSS Core
+
+`inferedge-moss-core` is the high-performance Rust-based core library that powers the MOSS semantic search SDK.
+
+## Overview
+
+This package is designed to be used as a dependency by higher-level SDKs.
+
+**Note**: For most use cases, you should use [`inferedge-moss`](https://pypi.org/project/inferedge-moss/) instead, which provides a complete Python SDK with cloud integration and a user-friendly API.
+
+## Installation
+
+```bash
+pip install inferedge-moss-core
+```
+
+## Usage
+
+This is a low-level library. For typical usage, install the main SDK:
+
+```bash
+pip install inferedge-moss
+```
+
+## Related Packages
+
+- [`inferedge-moss`](https://pypi.org/project/inferedge-moss/) - Complete Python SDK with cloud integration
+- [`@inferedge/moss`](https://www.npmjs.com/package/@inferedge/moss) - JavaScript/TypeScript SDK
+
+## 📄 License
+
+This package is licensed under the [PolyForm Shield License 1.0.0](./LICENSE).
+
+- ✅ Free for any use, including production and commercial use.
+- ❌ Not permitted: providing a product that competes with Moss.
+- 📩 For commercial licenses, contact: <contact@inferedge.dev>
+
+## 📬 Contact
+
+For support, commercial licensing, or partnership inquiries, contact us: [contact@inferedge.dev](mailto:contact@inferedge.dev)

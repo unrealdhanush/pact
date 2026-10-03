@@ -1,0 +1,103 @@
+"""
+Moss Semantic Search SDK
+
+Powerful Python SDK for semantic search using state-of-the-art embedding models.
+
+Example:
+    ```python
+    from moss import MossClient, DocumentInfo
+
+    client = MossClient('your-project-id', 'your-project-key')
+
+    docs = [DocumentInfo(id="1", text="Example document")]
+
+    result = await client.create_index('my-index', docs, 'moss-minilm')
+
+    await client.load_index('my-index')
+    results = await client.query('my-index', 'search query')
+    ```
+
+Local-first session indexing:
+    ```python
+    session = await client.session("call-abc123")
+
+    await session.add_docs([DocumentInfo(id="1", text="Customer asked about billing")])
+    results = await session.query("billing issue")
+
+    result = await session.push_index()
+    ```
+"""
+
+from moss_core import (
+    DocumentInfo,
+    GetDocumentsOptions,
+    IndexInfo,
+    IndexStatus,
+    IndexStatusValues,
+    JobPhase,
+    JobProgress,
+    JobStatus,
+    JobStatusResponse,
+    LoadIndexesResult,
+    ModelRef,
+    MutationOptions,
+    MutationResult,
+    ParentGrouping,
+    PushIndexResult,
+    QueryOptions,
+    QueryResultDocumentInfo,
+    SearchResult,
+)
+
+from .client.job_handle import JobHandle
+from .client.manage_http import ManageApiError
+from .client.moss_client import MossClient, ParseFileInput, ParseOptions
+from .client.session_index import SessionIndex
+from .client.web_source import (
+    CreateWebSourceResult,
+    DeleteWebSourceResult,
+    ResyncWebSourceResult,
+    UpdateWebSourceResult,
+    WebSource,
+)
+
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
+
+try:
+    __version__ = _pkg_version("moss")
+except PackageNotFoundError:  # source tree not installed as a distribution
+    __version__ = "0.0.0+unknown"
+
+__all__ = [
+    "MossClient",
+    "ParseFileInput",
+    "ParseOptions",
+    "SessionIndex",
+    "JobHandle",
+    "PushIndexResult",
+    "ManageApiError",
+    "WebSource",
+    "CreateWebSourceResult",
+    "UpdateWebSourceResult",
+    "ResyncWebSourceResult",
+    "DeleteWebSourceResult",
+    # Core data types
+    "DocumentInfo",
+    "GetDocumentsOptions",
+    "ParentGrouping",
+    "IndexInfo",
+    "SearchResult",
+    "QueryResultDocumentInfo",
+    "ModelRef",
+    "IndexStatus",
+    "IndexStatusValues",
+    "QueryOptions",
+    "LoadIndexesResult",
+    # Mutation types
+    "MutationResult",
+    "MutationOptions",
+    "JobStatus",
+    "JobPhase",
+    "JobProgress",
+    "JobStatusResponse",
+]
