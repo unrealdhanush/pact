@@ -23,7 +23,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Awaitable, Callable
 
 from pydantic import BaseModel
 
@@ -33,6 +33,8 @@ from .transport import Handler
 log = logging.getLogger("pact.band")
 
 AGENT_NAMES = ("ShopperAgent", "MerchantAgent")
+# BAND sits behind Cloudflare, which rejects the default Python-urllib signature (error 1010).
+USER_AGENT = "pact-agents/0.1 (+https://github.com/unrealdhanush/pact)"
 PAYLOAD_RE = re.compile(r"\n*```pact\n(.*?)\n```\s*$", re.S)
 Request = Callable[[str, str, str, dict | None], Awaitable[dict]]
 
@@ -66,7 +68,8 @@ async def urllib_request(method: str, url: str, key: str, body: dict | None) -> 
     def call() -> dict:
         data = json.dumps(body).encode() if body is not None else None
         req = urllib.request.Request(url, data=data, method=method, headers={
-            "X-API-Key": key, "Content-Type": "application/json", "Accept": "application/json"})
+            "X-API-Key": key, "Content-Type": "application/json", "Accept": "application/json",
+            "User-Agent": USER_AGENT})
         try:
             with urllib.request.urlopen(req, timeout=10) as r:
                 raw = r.read()
@@ -121,7 +124,108 @@ def decode_content(content: str, identities: dict[str, Identity]) -> tuple[str, 
         content = content[: m.start()]
     for ident in identities.values():
         content = content.replace(f"@{ident.tag}", f"@{ident.name}")
+        if ident.id:
+            content = content.replace(f"@[[{ident.id}]]", f"@{ident.name}")  # BAND's stored mention token
     return content.strip(), payload
+
+
+class AgentSocket:
+    """One persistent BAND WebSocket per agent key, shared by every deal room.
+
+    BAND rate-limits WebSocket connects (HTTP 429), so rooms join/leave topics on
+    a long-lived connection instead of opening sockets per deal.
+    """
+    pool: dict[tuple[str, str], "AgentSocket"] = {}
+
+    def __init__(self, ws_url: str, key: str, name: str):
+        self.ws_url, self.key, self.name = ws_url, key, name
+        self.ws = None
+        self.rooms: dict[str, tuple["BandRoom", Identity]] = {}
+        self._replies: dict[str, asyncio.Future] = {}
+        self._ref = 0
+        self._lock = asyncio.Lock()
+        self._tasks: set[asyncio.Task] = set()
+
+    @classmethod
+    def get(cls, ws_url: str, ident: Identity) -> "AgentSocket":
+        sock = cls.pool.get((ws_url, ident.key))
+        if sock is None:
+            sock = cls.pool[(ws_url, ident.key)] = cls(ws_url, ident.key, ident.name)
+        return sock
+
+    def _next_ref(self) -> str:
+        self._ref += 1
+        return str(self._ref)
+
+    async def _ensure(self) -> None:
+        if self.ws is not None:
+            return
+        from websockets.asyncio.client import connect
+        from websockets.exceptions import InvalidStatus
+        url = f"{self.ws_url}?{urllib.parse.urlencode({'api_key': self.key, 'vsn': '2.0.0'})}"
+        delay = 1.0
+        for attempt in range(4):
+            try:
+                self.ws = await asyncio.wait_for(connect(url, open_timeout=8, user_agent_header=USER_AGENT), 10)
+                break
+            except InvalidStatus as e:
+                if e.response.status_code != 429 or attempt == 3:
+                    raise
+                log.warning("BAND websocket 429 for %s; retrying in %.0fs", self.name, delay)
+                await asyncio.sleep(delay)
+                delay *= 2
+        for coro in (self._reader(self.ws), self._heartbeat(self.ws)):
+            t = asyncio.create_task(coro)
+            self._tasks.add(t)
+            t.add_done_callback(self._tasks.discard)
+
+    async def join(self, topic: str, room: "BandRoom", ident: Identity) -> None:
+        async with self._lock:
+            await self._ensure()
+            self.rooms[topic] = (room, ident)
+            ref = self._next_ref()
+            fut = asyncio.get_running_loop().create_future()
+            self._replies[ref] = fut
+            await self.ws.send(json.dumps([ref, ref, topic, "phx_join", {}]))
+        reply = await asyncio.wait_for(fut, 8)
+        if reply.get("status") != "ok":
+            self.rooms.pop(topic, None)
+            raise BandError(f"join {topic} as {ident.name}: {reply.get('response')}")
+
+    async def leave(self, topic: str) -> None:
+        if self.rooms.pop(topic, None) and self.ws is not None:
+            try:
+                ref = self._next_ref()
+                await self.ws.send(json.dumps([ref, ref, topic, "phx_leave", {}]))
+            except Exception:  # noqa: BLE001
+                pass
+
+    async def _heartbeat(self, ws) -> None:
+        while True:
+            await asyncio.sleep(25)
+            await ws.send(json.dumps([None, self._next_ref(), "phoenix", "heartbeat", {}]))
+
+    async def _reader(self, ws) -> None:
+        try:
+            async for raw in ws:
+                try:
+                    frame = json.loads(raw)
+                    _, ref, topic, event, payload = frame
+                    if event == "phx_reply" and ref in self._replies:
+                        self._replies.pop(ref).set_result(payload)
+                    elif topic in self.rooms:
+                        room, ident = self.rooms[topic]
+                        room._handle_frame(frame, ident)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("bad BAND frame for %s: %s", self.name, e)
+        except Exception as e:  # noqa: BLE001
+            log.warning("BAND socket for %s closed: %s", self.name, e)
+        finally:
+            if self.ws is ws:
+                self.ws = None
+            for room, _ in list(self.rooms.values()):
+                room.stats["ws_connected"] = max(0, room.stats.get("ws_connected", 1) - 1)
+            self.rooms.clear()
 
 
 class BandRoom:
@@ -142,7 +246,6 @@ class BandRoom:
         self._pending: dict[str, _Pending] = {}
         self._seen: set[str] = set()
         self._early: dict[str, dict] = {}
-        self._sockets: list[Any] = []
         self.identities = {
             "ShopperAgent": Identity("ShopperAgent", config.shopper_key),
             "MerchantAgent": Identity("MerchantAgent", config.merchant_key),
@@ -175,58 +278,21 @@ class BandRoom:
         return room
 
     async def _connect_sockets(self) -> None:
-        try:
-            from websockets.asyncio.client import connect
-        except ImportError:  # pragma: no cover
-            self.transport_name = "BAND (live post · local delivery)"
-            return
-        results = await asyncio.gather(*(self._open_socket(connect, i) for i in self.identities.values()),
-                                       return_exceptions=True)
+        topic = f"chat_room:{self.chat_id}"
+        results = await asyncio.gather(
+            *(AgentSocket.get(self.config.ws_url, i).join(topic, self, i) for i in self.identities.values()),
+            return_exceptions=True)
         failures = [r for r in results if isinstance(r, Exception)]
         for f in failures:
             log.warning("BAND websocket failed: %s", f)
+            self.last_error = f"WebSocket: {f}"
+        self.stats["ws_connected"] = len(results) - len(failures)
         if failures:
             self.transport_name = "BAND (live post · local delivery)"
         self._status()
 
-    async def _open_socket(self, connect, ident: Identity) -> None:
-        url = f"{self.config.ws_url}?{urllib.parse.urlencode({'api_key': ident.key, 'vsn': '2.0.0'})}"
-        ws = await asyncio.wait_for(connect(url, open_timeout=8), 10)
-        topic = f"chat_room:{self.chat_id}"
-        await ws.send(json.dumps(["1", "1", topic, "phx_join", {}]))
-        deadline = time.monotonic() + 8
-        while True:
-            frame = json.loads(await asyncio.wait_for(ws.recv(), max(0.1, deadline - time.monotonic())))
-            if frame[2] == topic and frame[3] == "phx_reply" and frame[1] == "1":
-                if frame[4].get("status") != "ok":
-                    await ws.close()
-                    raise BandError(f"join {topic} as {ident.name}: {frame[4].get('response')}")
-                break
-            self._handle_frame(frame)
-        self._sockets.append(ws)
-        self.stats["ws_connected"] += 1
-        self._spawn(self._reader(ws, ident))
-        self._spawn(self._heartbeat(ws))
-
-    async def _heartbeat(self, ws) -> None:
-        ref = 100
-        while True:
-            await asyncio.sleep(25)
-            ref += 1
-            await ws.send(json.dumps([None, str(ref), "phoenix", "heartbeat", {}]))
-
-    async def _reader(self, ws, ident: Identity) -> None:
-        try:
-            async for raw in ws:
-                try:
-                    self._handle_frame(json.loads(raw))
-                except Exception as e:  # noqa: BLE001
-                    log.warning("bad BAND frame for %s: %s", ident.name, e)
-        except Exception as e:  # noqa: BLE001
-            log.warning("BAND socket for %s closed: %s", ident.name, e)
-
     # ------------------------------------------------------------ delivery
-    def _handle_frame(self, frame: list) -> None:
+    def _handle_frame(self, frame: list, receiver: Identity | None = None) -> None:
         _, _, topic, event, payload = frame
         if event != "message_created" or topic != f"chat_room:{self.chat_id}":
             return
@@ -234,7 +300,7 @@ class BandRoom:
         pending = self._pending.get(band_id)
         if pending is None:
             # The socket can beat the REST response that tells us this id.
-            self._early[band_id] = payload
+            self._early[band_id] = (payload, receiver)
             return
         if pending.delivered.is_set():
             return
@@ -246,6 +312,18 @@ class BandRoom:
         pending.delivered.set()
         self.stats["ws_delivered"] += 1
         self._dispatch(msg)
+        if receiver is not None:
+            self._spawn(self._ack(band_id, receiver))
+
+    async def _ack(self, band_id: str, receiver: Identity) -> None:
+        """Run BAND's processing lifecycle so delivered messages don't sit as pending."""
+        base = f"/agent/chats/{self.chat_id}/messages/{band_id}"
+        try:
+            await self._call("POST", f"{base}/processing", receiver.name, {})
+            await self._call("POST", f"{base}/processed", receiver.name, {})
+            self.stats["acked"] = self.stats.get("acked", 0) + 1
+        except BandError as e:
+            log.warning("BAND ack for %s failed: %s", band_id, e)
 
     def _dispatch(self, msg: RoomMessage) -> None:
         if msg.id in self._seen:
@@ -312,7 +390,7 @@ class BandRoom:
         self._pending[band_id] = _Pending(msg)
         early = self._early.pop(band_id, None)
         if early is not None:
-            self._handle_frame([None, None, f"chat_room:{self.chat_id}", "message_created", early])
+            self._handle_frame([None, None, f"chat_room:{self.chat_id}", "message_created", early[0]], early[1])
         self._spawn(self._await_delivery(band_id))
         return msg
 
@@ -340,11 +418,11 @@ class BandRoom:
         self._status()
 
     async def close(self) -> None:
-        for ws in self._sockets:
-            try:
-                await ws.close()
-            except Exception:  # noqa: BLE001
-                pass
+        topic = f"chat_room:{self.chat_id}"
+        for ident in self.identities.values():
+            sock = AgentSocket.pool.get((self.config.ws_url, ident.key))
+            if sock:
+                await sock.leave(topic)
         for t in list(self._tasks):
             t.cancel()
 
@@ -384,6 +462,7 @@ async def bootstrap_agents(request: Request | None = None, cache: Path = AGENT_C
         lines.append(f"{env}={agent_key}  # BAND agent id {(resp.get('agent') or {}).get('id', '?')}")
     if lines:
         with cache.open("a") as f:
+            cache.chmod(0o600)
             f.write("# Auto-registered by pact.band — BAND shows agent keys only once.\n" + "\n".join(lines) + "\n")
     return BandConfig.from_env()
 
