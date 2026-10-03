@@ -312,6 +312,34 @@ const dealParam = qs.get("id") || `deal-${1000 + (crypto.getRandomValues(new Uin
 let demoProduct = "sony-wh1000xm5", boundarySaving = false, demoChoosing = false;
 let deal = null, source = null, listPrice = 0, why = [], agreement = null, authority = null, integrations = [];
 
+// Public demo proxies can buffer SSE. Read the same backend event log without
+// changing agent execution, and stop requests when the user starts another deal.
+class HostedDealEvents {
+  constructor(url) {
+    this.url = url.replace(/\/events$/, ''); this.cursor = 0; this.closed = false;
+    this.connected = false; this.controller = new AbortController();
+    queueMicrotask(() => this.poll());
+  }
+  async poll() {
+    if (this.closed) return;
+    try {
+      const r = await fetch(this.url, { cache: 'no-store', signal: this.controller.signal });
+      if (!r.ok) throw new Error(`Deal connection: ${r.status}`);
+      const snapshot = await r.json();
+      if (this.closed) return;
+      if (!this.connected) { this.connected = true; this.onopen?.(); }
+      for (const event of (snapshot.events || []).slice(this.cursor)) {
+        this.cursor++; this.onmessage?.({ data: JSON.stringify(event) });
+      }
+    } catch (error) {
+      if (this.closed) return;
+      this.connected = false; this.onerror?.(error);
+    }
+    if (!this.closed) this.timer = setTimeout(() => this.poll(), 650);
+  }
+  close() { this.closed = true; clearTimeout(this.timer); this.controller.abort(); }
+}
+
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const money = n => "$" + (Number.isInteger(+n) ? n : (+n).toFixed(2));
 const shipLabel = s => s === "free_next_day" ? "Free next-day" : "Standard shipping";
@@ -650,7 +678,8 @@ async function start(intakeId = null) {
   renderRules(deal, deal.intake);
   pushStep(money(listPrice), "list price", "struck");
   $("stage").innerHTML = `<div class="k">Finding the best offer for ${esc(deal.product.name)}…</div>`;
-  source = new EventSource(`/api/deals/${deal.id}/events`);
+  const Feed = ['localhost','127.0.0.1','::1'].includes(location.hostname) ? EventSource : HostedDealEvents;
+  source = new Feed(`/api/deals/${deal.id}/events`);
   source.onerror = () => notice('Connection interrupted. Reconnecting to the deal room…');
   source.onopen = () => notice();
   source.onmessage = ev => {
