@@ -47,7 +47,8 @@ SEED_MEMORY = [
      "payload": {"max_price": 300}},
     {"id": "watch-sony-xm5", "kind": "research",
      "text": "Price watch: the Sony WH-1000XM5 is listed at $299.99 on sony.com.",
-     "payload": {"competitor_retailer": "sony.com", "competitor_price": 299.99}},
+     "payload": {"competitor_retailer": "sony.com", "competitor_price": 299.99,
+                 "competitor_product_id": "sony-wh1000xm5"}},
     {"id": "history-bose", "kind": "history",
      "text": "Returned Bose QuietComfort headphones last year because they got uncomfortable after an hour; "
              "a long return window matters.",
@@ -61,9 +62,9 @@ SEED_CATALOG = [
     {"id": "sony-wf1000xm5", "text": "Sony WF-1000XM5 true wireless noise-cancelling earbuds, compact in-ear.",
      "payload": {"product_id": "sony-wf1000xm5", "name": "Sony WF-1000XM5", "carried": False}},
     {"id": "bose-qc-ultra", "text": "Bose QuietComfort Ultra headphones, over-ear noise cancelling, spatial audio.",
-     "payload": {"product_id": "bose-qc-ultra", "name": "Bose QuietComfort Ultra", "carried": False}},
+     "payload": {"product_id": "bose-qc-ultra", "name": "Bose QuietComfort Ultra", "carried": True}},
     {"id": "sennheiser-m4", "text": "Sennheiser Momentum 4 wireless over-ear headphones, 60-hour battery.",
-     "payload": {"product_id": "sennheiser-m4", "name": "Sennheiser Momentum 4", "carried": False}},
+     "payload": {"product_id": "sennheiser-m4", "name": "Sennheiser Momentum 4", "carried": True}},
     {"id": "airpods-max", "text": "Apple AirPods Max over-ear headphones with active noise cancellation.",
      "payload": {"product_id": "airpods-max", "name": "Apple AirPods Max", "carried": False}},
 ]
@@ -140,6 +141,9 @@ class ShopperMemory:
         hits, ms = await self._query(CATALOG_INDEX, SEED_CATALOG, utterance, 1)
         return (hits[0] if hits else None), ms
 
+    async def search_catalog(self, utterance: str, top_k: int = 5) -> tuple[list[Recall], float]:
+        return await self._query(CATALOG_INDEX, SEED_CATALOG, utterance, top_k)
+
     async def _query(self, index: str, seed: list[dict], query: str, top_k: int) -> tuple[list[Recall], float]:
         await self.load()
         t0 = time.perf_counter()
@@ -201,12 +205,14 @@ def integration_status() -> dict:
         else {"name": "Moss", "mode": "fallback", "detail": "no MOSS_PROJECT_ID/KEY — local keyword memory (simulated)"})
 
 
-async def _seed() -> None:
-    """Rebuild both indexes from the seed documents (drops remembered outcomes)."""
+async def _seed(only: str | None = None) -> None:
+    """Rebuild indexes from the seed documents (the memory index loses remembered outcomes)."""
     from moss import MossClient
     client = MossClient(os.environ["MOSS_PROJECT_ID"], os.environ["MOSS_PROJECT_KEY"])
     names = {getattr(i, "name", i) for i in await client.list_indexes()}
     for name, seed in ((MEMORY_INDEX, SEED_MEMORY), (CATALOG_INDEX, SEED_CATALOG)):
+        if only and name != only:
+            continue
         if name in names:
             await client.delete_index(name)
         await client.create_index(name, _docs(seed), MODEL)
@@ -217,6 +223,8 @@ if __name__ == "__main__":
     import pact  # noqa: F401  (loads .env)
     if "--seed" in sys.argv:
         asyncio.run(_seed())
+    elif "--seed-catalog" in sys.argv:
+        asyncio.run(_seed(CATALOG_INDEX))
 
 
 async def rank(texts: dict[str, str], query: str) -> tuple[list[tuple[str, float]], float, str]:

@@ -13,7 +13,8 @@ from .agents.shopper import ShopperAgent
 from .agents.zoowork_merchant import ZooWorkMerchantAgent
 from .band import BandConfig, BandRoom, bootstrap_agents
 from .protocol import Agreement, RoomMessage
-from .scenario import MerchantState, Product, ShopperState
+from . import scenario
+from .scenario import ShopperState
 from .engine import money
 from .transport import LocalRoom
 from .zoowork import load_agent_id
@@ -25,15 +26,16 @@ Status = Literal["negotiating", "awaiting_approval", "complete", "failed"]
 
 class Deal:
     def __init__(self, pace: float = 1.2, deal_id: str | None = None, band: BandConfig | None = None,
-                 shopper_state: ShopperState | None = None, on_complete=None):
+                 shopper_state: ShopperState | None = None, on_complete=None,
+                 product_id: str = "sony-wh1000xm5"):
         self.id = deal_id or f"deal-{random.randint(1000, 9999)}"
         self.pace = pace
         self.status: Status = "negotiating"
         self.phase = "setup"
-        self.product = Product()
+        self.product = scenario.product(product_id)
         self.shopper_state = shopper_state or ShopperState()
         self.on_complete = on_complete  # async callback(deal) after execution, e.g. remember the outcome
-        self.merchant_state = MerchantState()
+        self.merchant_state = scenario.merchant_state(product_id)
         self.agreement: Agreement | None = None
         self.authority: dict | None = None
         self.execution: dict | None = None
@@ -262,11 +264,13 @@ class DealStore:
         self._tasks: set[asyncio.Task] = set()
 
     async def create(self, pace: float = 1.2, deal_id: str | None = None,
-                     shopper_state: ShopperState | None = None, on_complete=None) -> Deal:
+                     shopper_state: ShopperState | None = None, on_complete=None,
+                     product_id: str = "sony-wh1000xm5") -> Deal:
         old = self.deals.pop(deal_id, None) if deal_id else None
         if old is not None:
             await old.close()
-        deal = Deal(pace=pace, deal_id=deal_id, shopper_state=shopper_state, on_complete=on_complete)
+        deal = Deal(pace=pace, deal_id=deal_id, shopper_state=shopper_state, on_complete=on_complete,
+                    product_id=product_id)
         await deal.setup()
         self.deals[deal.id] = deal
         task = asyncio.create_task(deal.run())

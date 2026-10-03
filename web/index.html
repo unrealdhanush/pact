@@ -104,6 +104,21 @@
   body.decision .room { flex: 0 0 120px; }
   body.decision .stage { flex: 1; display: flex; flex-direction: column; justify-content: center; border-top-color: #333a45; }
   .k { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  /* product options ------------------------------------------------------- */
+  .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 10px 0 14px; text-align: left; }
+  .opt { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #12151a; cursor: pointer;
+         transition: border-color .2s, transform .2s, background .2s; display: flex; flex-direction: column; gap: 4px; }
+  .opt:hover { transform: translateY(-2px); border-color: #3a414c; }
+  .opt.sel { border-color: var(--shopper); background: var(--shopper-dim); }
+  .opt.off { opacity: .45; cursor: not-allowed; transform: none; }
+  .opt .nm { font-weight: 700; font-size: 14px; }
+  .opt .sp { color: var(--muted); font-size: 11.5px; line-height: 1.35; }
+  .opt .pr { font-size: 20px; font-weight: 800; margin-top: 4px; }
+  .opt .ref { font-size: 11.5px; color: var(--shopper); }
+  .opt .vr { font: 11px var(--mono); color: var(--muted); }
+  .budget { display: flex; align-items: center; gap: 12px; justify-content: center; margin: 4px 0 14px; font-size: 14px; }
+  .budget input[type=range] { width: 46%; accent-color: var(--shopper); }
+  .budget b { font-size: 20px; min-width: 70px; text-align: left; }
   .price { font-size: 52px; font-weight: 800; line-height: 1.05; margin: 2px 0; letter-spacing: -.01em; }
   .price s { font-size: 24px; color: var(--muted); font-weight: 500; margin-right: 10px; }
   .terms { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
@@ -473,15 +488,53 @@ function renderIntake(v) {
   const shopper = { max_price: val("max_price") ?? 0, preferred_variant: val("preferred_variant") || "—",
     fallback_variants: val("fallback_variants") || [], fallback_return_days: val("fallback_return_days") ?? 45,
     delivery_deadline: val("delivery_deadline"), minimum_return_days: val("minimum_return_days") ?? 30,
-    approval_required_above: val("approval_required_above") ?? 0, competitor_price: val("competitor_price"),
-    competitor_retailer: val("competitor_retailer") };
+    approval_required_above: val("approval_required_above") ?? 0 };
+  if (val("competitor_price") && [undefined, v.product?.product_id].includes(val("competitor_product_id")))
+    Object.assign(shopper, { competitor_price: val("competitor_price"), competitor_retailer: val("competitor_retailer") });
   if (scenarioCache) renderRules({ shopper, merchant: scenarioCache.merchant }, f);
   $("memLabel").hidden = !v.recalled.length;
   const live = v.memory?.mode === "live";
   $("mems").innerHTML = v.recalled.map(r => `<div>“${esc(r.text)}”<span class="ms">${live ? r.ms + " ms" : "local"}</span></div>`).join("");
-  if (v.product) $("productLine").textContent = `${v.product.name}${v.product.carried ? "" : " — not sold by reachable merchants"}`;
-  const b = $("startBtn");
-  if (b && v.product?.carried) b.textContent = "Find a merchant & negotiate";
+  if (v.options?.length) renderOptions(v);
+  else if (v.product) $("productLine").textContent = `${v.product.name}${v.product.carried ? "" : " — not sold by reachable merchants"}`;
+
+}
+function renderOptions(v) {
+  if (deal && deal.status !== "complete" && deal.status !== "failed" && source) return;  // a deal is running
+  const f = v.fields, sel = v.product?.product_id;
+  const cards = v.options.map(o => {
+    const ref = o.carried && f.competitor_price && f.competitor_product_id?.value === o.product_id
+      ? `<div class="ref">Seen at ${esc(f.competitor_retailer.value)}: ${money(f.competitor_price.value)}</div>` : "";
+    return o.carried
+      ? `<div class="opt ${o.product_id === sel ? "sel" : ""}" data-pid="${o.product_id}" role="button" tabindex="0">
+           <div class="nm">${esc(o.name)}</div><div class="sp">${esc(o.specs || "")}</div>
+           <div class="pr">${money(o.list_price)}</div>${ref}
+           <div class="vr">${(o.variants || []).map(cap).join(" · ")} · Aria Audio</div></div>`
+      : `<div class="opt off" title="No merchant agent on BAND sells this"><div class="nm">${esc(o.name)}</div>
+           <div class="sp">No merchant agent sells this yet</div></div>`;
+  }).join("");
+  const max = f.max_price?.value ?? 300, src = f.max_price?.source || "default";
+  $("stage").innerHTML = `<div class="k">Your agent found ${v.options.filter(o => o.carried).length} options · pick one</div>
+    <div class="opts">${cards}</div>
+    <div class="budget"><span class="k">Max I'll pay</span>
+      <input type="range" id="maxPrice" min="150" max="500" step="5" value="${max}" />
+      <b id="maxLabel">${money(max)}</b><span class="src ${src}">${src === "you" ? "YOU" : src.toUpperCase()}</span></div>
+    <button class="start" id="startBtn">Negotiate for me</button>`;
+  document.querySelectorAll(".opt[data-pid]").forEach(el => {
+    const pick = () => choose(el.dataset.pid, null);
+    el.onclick = pick; el.onkeydown = e => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), pick());
+  });
+  const r = $("maxPrice");
+  r.oninput = () => $("maxLabel").textContent = money(+r.value);
+  r.onchange = () => choose(sel, +r.value);
+  $("startBtn").onclick = () => start(intake.intake_id);
+}
+async function choose(productId, maxPrice) {
+  const r = await fetch(`/api/intake/${intake.intake_id}/choose`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ product_id: productId || intake.product.product_id, ...(maxPrice != null ? { max_price: maxPrice } : {}) }) });
+  if (!r.ok) return;
+  intake = await r.json();
+  renderIntake(intake);
 }
 async function say(text) {
   text = text.trim(); if (!text) return;

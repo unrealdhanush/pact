@@ -78,6 +78,18 @@ async def intake(body: dict):
     return await intakes.get_or_new(body.get("intake_id")).turn(text)
 
 
+@app.post("/api/intake/{intake_id}/choose")
+async def choose_product(intake_id: str, body: dict):
+    """The human picks a product card and (optionally) their max price."""
+    it = intakes.items.get(intake_id)
+    if it is None:
+        raise HTTPException(404, "unknown intake")
+    try:
+        return await it.choose(str(body.get("product_id", "")), body.get("max_price"))
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
 async def _remember_outcome(deal) -> None:
     """Moss write-back: the next conversation recalls how this deal ended."""
     t = deal.agreement.terms
@@ -97,13 +109,14 @@ async def _remember_outcome(deal) -> None:
 async def create_deal(pace: float = 1.2, id: str | None = None, intake: str | None = None):
     if id is not None and not DEAL_ID.match(id):
         raise HTTPException(422, "id must look like deal-1842")
-    shopper_state, on_complete = None, None
+    shopper_state, on_complete, product_id = None, None, "sony-wh1000xm5"
     if intake:
         it = intakes.items.get(intake)
         if it is None or not it.product or not it.product.get("carried"):
             raise HTTPException(409, "intake is not ready: no product this merchant carries")
-        shopper_state, on_complete = it.shopper_state(), _remember_outcome
-    deal = await store.create(pace=pace, deal_id=id, shopper_state=shopper_state, on_complete=on_complete)
+        shopper_state, on_complete, product_id = it.shopper_state(), _remember_outcome, it.product["product_id"]
+    deal = await store.create(pace=pace, deal_id=id, shopper_state=shopper_state, on_complete=on_complete,
+                              product_id=product_id)
     return {**deal.snapshot(), "integrations": integrations(),
             "intake": intakes.items[intake].view("")["fields"] if intake else None}
 

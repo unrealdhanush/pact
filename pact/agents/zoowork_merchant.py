@@ -220,8 +220,12 @@ class ZooWorkMerchantAgent(MerchantAgent):
 
     def _leak(self, text: str) -> str | None:
         m = self.state
-        secrets = {f"{n}": f"{v} inventory" for v, n in m.inventory.items()}
-        secrets[f"{m.unit_cost:.0f}"] = "unit cost"
+        for v, n in m.inventory.items():  # stock counts only leak when phrased as stock ("4 units", "4 left")
+            if re.search(rf"(?<![\d$.]){n}\s*(units?|left|in stock|remaining|pieces|pairs)\b", text, re.I):
+                return f"{v} inventory"
+        if re.search(rf"(?<![\d.]){m.unit_cost:.0f}(?![\d]|\.\d)", text):  # "$170" or "170"
+            return "unit cost"
+        secrets = {}
         secrets[f"{m.max_auto_discount_pct:.0f}%"] = "discount cap"
         secrets[f"{m.min_margin_pct:.0f}%"] = "margin floor"
         for token, label in secrets.items():

@@ -147,15 +147,21 @@ def evaluate_conditions(
 
 # ----------------------------------------------------------------- shopper
 
-def make_proposal(s: ShopperState, transaction_id: str, product_id: str) -> Proposal:
+def opening_price(s: ShopperState, list_price: float) -> float:
+    """Open below both the shopper's own target and the public shelf price."""
+    return min(s.target_price, math.floor(list_price * 0.90))
+
+
+def make_proposal(s: ShopperState, transaction_id: str, product_id: str, list_price: float | None = None) -> Proposal:
     return Proposal(
         transaction_id=transaction_id, product_id=product_id,
-        requested_price=s.target_price, preferred_variant=s.preferred_variant,
+        requested_price=opening_price(s, list_price) if list_price else s.target_price, preferred_variant=s.preferred_variant,
         acceptable_variants=[s.preferred_variant, *s.fallback_variants],
         delivery_deadline=s.delivery_deadline, minimum_return_days=s.minimum_return_days,
         requires_human_approval=True,
         competitor_claim=CompetitorClaim(retailer=s.competitor_retailer, price=s.competitor_price)
-        if s.competitor_retailer and s.competitor_price else None,
+        if s.competitor_retailer and s.competitor_price
+        and s.competitor_product_id in (None, product_id) else None,
     )
 
 

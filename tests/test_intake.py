@@ -28,7 +28,9 @@ async def test_intake_fills_gaps_from_memory_and_tags_sources():
     assert f["fallback_variants"] == {**f["fallback_variants"], "value": ["silver"], "source": "memory"}
     assert f["approval_required_above"]["source"] == "memory" and f["approval_required_above"]["value"] == 250
     assert v["memory"]["mode"] == "fallback"  # labelled: no Moss in tests
-    assert "Shall I find a merchant" in v["reply"]
+    assert [o["product_id"] for o in v["options"] if o["carried"]][0] == "sony-wh1000xm5"
+    assert len([o for o in v["options"] if o["carried"]]) == 3
+    assert "Pick one and set your max price" in v["reply"]
 
     v = await it.turn("actually make it under 310")  # the human's correction wins
     assert v["fields"]["max_price"] == {**v["fields"]["max_price"], "value": 310.0, "source": "you"}
@@ -80,3 +82,18 @@ async def test_discovery_ranks_band_peers_and_picks_the_runnable_merchant(monkey
     assert [c["name"] for c in found["candidates"]][0] == "MerchantAgent"
     assert found["chosen"]["name"] == "MerchantAgent" and found["ranker"] == "local"
     assert "ShopperAgent" not in [c["name"] for c in found["candidates"]]
+
+
+async def test_choosing_another_product_and_price():
+    from pact import engine
+    it = Intake()
+    await it.turn("noise-cancelling headphones in black by Tuesday")
+    v = await it.choose("sennheiser-m4", max_price=280)
+    assert v["product"]["name"] == "Sennheiser Momentum 4" and v["product"]["list_price"] == 259.99
+    assert v["fields"]["max_price"] == {**v["fields"]["max_price"], "value": 280.0, "source": "you"}
+    assert "sony.com" not in v["reply"]  # the remembered Sony price doesn't apply to the Sennheiser
+    s = it.shopper_state()
+    p = engine.make_proposal(s, "deal-1", "sennheiser-m4", 259.99)
+    assert p.competitor_claim is None and p.requested_price <= 259.99 * 0.9
+    with pytest.raises(ValueError):
+        await it.choose("airpods-max")  # not sold by a reachable merchant

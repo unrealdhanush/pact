@@ -14,6 +14,7 @@ from datetime import date, timedelta
 
 from .engine import money
 from .memory import memory
+from . import scenario
 from .scenario import ShopperState, next_weekday
 
 COLOURS = ("black", "silver", "white", "blue", "midnight", "gray", "grey", "beige", "pink")
@@ -98,6 +99,7 @@ class Intake:
     turns: list[str] = field(default_factory=list)
     fields: dict[str, Boundary] = field(default_factory=dict)
     product: dict | None = None
+    options: list[dict] = field(default_factory=list)
     recalled: list[dict] = field(default_factory=list)
     confirmed: bool = False
     session: object = None
@@ -120,12 +122,38 @@ class Intake:
             self.fields[k] = Boundary(v, "you")
 
         if self.product is None:
-            hit, ms = await memory.resolve_product(text)
+            hits, ms = await memory.search_catalog(text, top_k=5)
             self.timings["catalog_ms"] = round(ms, 1)
-            if hit:
-                self.product = {**hit.payload, "match": hit.text, "score": round(hit.score, 3)}
+            self.options = [self._card(h) for h in hits]
+            # top 3 the merchant can actually negotiate, best match first; default selection = first
+            carried = [o for o in self.options if o["carried"]][:3]
+            self.options = carried + [o for o in self.options if not o["carried"]][:1]
+            if carried:  # default to the best match that can plausibly fit the budget
+                budget = self.fields["max_price"].value if "max_price" in self.fields else None
+                fits = [o for o in carried if budget is None or o.get("list_price", 0) * 0.9 <= budget]
+                self.product = (fits or carried)[0]
+            elif self.options:
+                self.product = self.options[0]
 
         await self._recall_missing()
+        return self.view(self.readback())
+
+    def _card(self, hit) -> dict:
+        p = hit.payload
+        card = {**p, "score": round(hit.score, 3), "match": hit.text}
+        if p.get("carried") and p.get("product_id") in scenario.CATALOG:
+            prod = scenario.product(p["product_id"])
+            card.update(list_price=prod.list_price, variants=list(prod.variants), specs=prod.specs)
+        return card
+
+    async def choose(self, product_id: str, max_price: float | None = None) -> dict:
+        """The human picks one of the options (and optionally sets their max price)."""
+        pick = next((o for o in self.options if o.get("product_id") == product_id and o.get("carried")), None)
+        if pick is None:
+            raise ValueError("not one of the negotiable options")
+        self.product = pick
+        if max_price is not None:
+            self.fields["max_price"] = Boundary(float(max_price), "you")
         return self.view(self.readback())
 
     async def _recall_missing(self) -> None:
@@ -163,7 +191,9 @@ class Intake:
                     f"Want me to look for the Sony WH-1000XM5 instead?")
         def val(k, default=None):
             return f[k].value if k in f else default
-        parts = [f"{self.product['name']}"]
+        others = [o["name"] for o in self.options if o["carried"] and o is not self.product]
+        lead = (f"I found {len(others) + 1} options; the closest match is the " if others else "")
+        parts = [f"{lead}{self.product['name']}"]
         if "preferred_variant" in f:
             parts[0] += f" in {val('preferred_variant')}"
         if "max_price" in f:
@@ -178,11 +208,14 @@ class Intake:
                        f"{val('fallback_return_days', 45)}-day returns")
         if "approval_required_above" in f and f["approval_required_above"].source == "memory":
             mem.append(f"I'll ask you before anything over {money(val('approval_required_above'))}")
-        if "competitor_price" in f and f["competitor_price"].source == "memory":
+        if ("competitor_price" in f and f["competitor_price"].source == "memory"
+                and val("competitor_product_id") in (None, self.product.get("product_id"))):
             mem.append(f"you've seen it at {val('competitor_retailer')} for {money(val('competitor_price'))}, "
                        f"so I'll use that as leverage")
         remembered = (" From what I remember: " + "; ".join(mem) + ".") if mem else ""
-        return f"Got it: {said}{remembered} Shall I find a merchant and negotiate?"
+        ask = ("Pick one and set your max price, or say yes to go with the "
+               f"{self.product['name']}." if others else "Shall I find a merchant and negotiate?")
+        return f"Got it: {said}{remembered} {ask}"
 
     def shopper_state(self) -> ShopperState:
         s = ShopperState()
@@ -198,7 +231,7 @@ class Intake:
     def view(self, reply: str) -> dict:
         return {
             "intake_id": self.id, "reply": reply, "turns": self.turns, "confirmed": self.confirmed,
-            "product": self.product, "fields": {k: b.as_dict() for k, b in self.fields.items()},
+            "product": self.product, "options": self.options, "fields": {k: b.as_dict() for k, b in self.fields.items()},
             "recalled": self.recalled, "timings": self.timings, "memory": memory.status(),
             "session": bool(self.session),
         }

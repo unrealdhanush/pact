@@ -25,10 +25,10 @@ class ShopperAgent(Agent):
         s = self.state
         self.think(f"Owner wants {self.product.name}; budget ceiling stays private")
         await self.pause(0.6)
-        self.think(f"Opening below ceiling at {money(s.target_price)}")
-        if s.competitor_price:
+        self.think(f"Opening below ceiling at {money(engine.opening_price(s, self.product.list_price))}")
+        if s.competitor_price and s.competitor_product_id in (None, self.product.id):
             self.think(f"Found it at {s.competitor_retailer} for {money(s.competitor_price)} — citing it as leverage")
-        p = engine.make_proposal(s, self.room.id, self.product.id)
+        p = engine.make_proposal(s, self.room.id, self.product.id, self.product.list_price)
         await self.pause()
         await self.room.post(
             self.name,
