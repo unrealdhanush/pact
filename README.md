@@ -121,6 +121,7 @@ async def check_authority(agreement, shopper_state, merchant_state) -> Authority
 #   {transaction_id, decision: AUTO_APPROVE|HUMAN_APPROVAL_REQUIRED|REJECT, merchant_policy_ok,
 #    shopper_policy_ok, reason, checks: [{side, rule, ok, detail}], source: "jev"|"local", jev_raw}
 def integration_status() -> dict   # {"name": "Jev", "mode": "live"|"fallback", "detail": "..."}
+#   reads JEV_API_KEY, JEV_BASE_URL (root, default https://api.typesafe.ai → POST /v1/systemone), JEV_MODEL
 
 # pact/zoowork.py, pact/tavily.py
 def integration_status() -> dict
