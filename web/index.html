@@ -210,7 +210,9 @@ function renderRoomMode(room) {
   if (!room) return;
   $("roomName").textContent = room.title || "# deal room";
   $("roomMode").innerHTML = room.live
-    ? `<span class="live">● BAND live</span> · ${room.posted ?? 0} msgs · ${room.ws_delivered ?? 0} via WebSocket${room.local_delivered ? ` · ${room.local_delivered} local fallback` : ""}`
+    ? (room.ws_connected >= 2
+        ? `<span class="live">● BAND live</span> · ${room.posted ?? 0} msgs · ${room.ws_delivered ?? 0} delivered via WebSocket${room.local_delivered ? ` · ${room.local_delivered} local fallback` : ""}`
+        : `<span class="live">● BAND live (REST)</span> · <span class="sim">WebSocket unavailable — ${room.local_delivered ?? 0} delivered locally</span>`)
     : `<span class="sim">● ${esc(room.transport)}</span> · not on BAND`;
   renderChips(null, room);
 }
