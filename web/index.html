@@ -3,112 +3,173 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pact</title>
+<title>Pact — the transaction layer for agentic commerce</title>
 <style>
   :root {
-    --bg: #0d0f12; --panel: #15181d; --line: #262b33; --text: #eef0f3; --muted: #8a93a1;
-    --shopper: #4fd1c5; --shopper-dim: rgba(79,209,197,.12);
-    --merchant: #f6ad55; --merchant-dim: rgba(246,173,85,.12);
-    --ok: #68d391; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --bg: #0b0d10; --panel: #13161b; --panel2: #181c22; --line: #252a32; --text: #eef0f3; --muted: #8a93a1;
+    --shopper: #4fd1c5; --shopper-dim: rgba(79,209,197,.11);
+    --merchant: #f6ad55; --merchant-dim: rgba(246,173,85,.11);
+    --ok: #68d391; --ok-dim: rgba(104,211,145,.12); --warn: #f6c453; --warn-dim: rgba(246,196,83,.12);
+    --bad: #fc8181; --bad-dim: rgba(252,129,129,.12); --jev: #b794f4; --jev-dim: rgba(183,148,244,.12);
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; }
-  header { display: flex; align-items: center; gap: 20px; padding: 18px 28px; border-bottom: 1px solid var(--line); }
-  .brand { font-size: 30px; font-weight: 800; letter-spacing: .18em; }
-  .tag { color: var(--muted); font-size: 17px; }
-  .chips { margin-left: auto; display: flex; gap: 10px; }
-  .chip { font: 13px var(--mono); padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
-  .chip.live { color: var(--ok); border-color: rgba(104,211,145,.4); }
+  html, body { height: 100%; }
+  body { margin: 0; background: radial-gradient(1200px 600px at 50% -200px, #161b24 0%, var(--bg) 60%); color: var(--text);
+         font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; overflow: hidden; }
+  header { display: flex; align-items: center; gap: 18px; padding: 12px 24px; border-bottom: 1px solid var(--line); height: 60px; }
+  .brand { font-size: 24px; font-weight: 800; letter-spacing: .2em; }
+  .tag { color: var(--muted); font-size: 14px; }
+  .chips { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .chip { font: 12px var(--mono); padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  .chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); display: inline-block; }
+  .chip.live { color: var(--ok); border-color: rgba(104,211,145,.4); } .chip.live i { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .chip.fallback { color: var(--warn); border-color: rgba(246,196,83,.35); } .chip.fallback i { background: var(--warn); }
+  .chip b { font-weight: 700; color: var(--text); }
+  .chip.deal { color: var(--text); border-color: #3a414c; }
 
-  main { display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 20px; padding: 20px 28px; height: calc(100vh - 75px); }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; display: flex; flex-direction: column; min-height: 0; }
-  .side h2 { margin: 0; padding: 18px 20px 6px; font-size: 22px; display: flex; align-items: center; gap: 10px; }
-  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  main { display: grid; grid-template-columns: 300px 1fr 300px; gap: 16px; padding: 14px 24px 16px; height: calc(100vh - 60px); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; display: flex; flex-direction: column; min-height: 0; transition: opacity .5s, filter .5s; }
+  body.decision .side { opacity: .45; filter: saturate(.6); }
+  .side h2 { margin: 0; padding: 14px 18px 2px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
   .shopper .dot { background: var(--shopper); box-shadow: 0 0 12px var(--shopper); }
   .merchant .dot { background: var(--merchant); box-shadow: 0 0 12px var(--merchant); }
-  .sub { padding: 0 20px; color: var(--muted); font-size: 14px; }
-  .label { padding: 16px 20px 6px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); display: flex; gap: 8px; align-items: center; }
-  .lock { font-size: 11px; padding: 1px 7px; border-radius: 4px; background: #222730; letter-spacing: .05em; }
-  dl { margin: 0; padding: 0 20px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 16px; }
+  .sub { padding: 0 18px; color: var(--muted); font-size: 13px; }
+  .label { padding: 12px 18px 6px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .lock { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #222730; letter-spacing: .05em; }
+  dl { margin: 0; padding: 0 18px; display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; font-size: 14px; }
   dt { color: var(--muted); } dd { margin: 0; font-weight: 600; text-align: right; }
-  .trace { flex: 1; overflow-y: auto; padding: 4px 20px 20px; font: 13px/1.5 var(--mono); }
-  .trace div { padding: 5px 0; border-bottom: 1px dashed #20242b; color: #b8c0cc; animation: in .3s ease; }
+  .trace { flex: 1; overflow-y: auto; padding: 2px 18px 16px; font: 12px/1.5 var(--mono); min-height: 0; }
+  .trace div { padding: 4px 0; border-bottom: 1px dashed #1f232a; color: #b8c0cc; animation: in .3s ease; }
   .trace .tool::before { content: "⚙ "; color: var(--merchant); }
   .trace .think::before { content: "› "; color: var(--muted); }
   .shopper .trace .think::before { color: var(--shopper); }
 
-  .center { padding: 0; }
-  .ladder { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; padding: 22px 20px 16px; border-bottom: 1px solid var(--line); min-height: 92px; }
-  .step { font-size: 24px; font-weight: 700; padding: 8px 14px; border-radius: 10px; background: #1c2027; color: var(--muted); animation: in .4s ease; white-space: nowrap; }
-  .step small { display: block; font-size: 12px; font-weight: 500; letter-spacing: .04em; }
+  /* center ---------------------------------------------------------------- */
+  .center { padding: 0; overflow: hidden; }
+  .path { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; row-gap: 8px; padding: 12px 18px 10px; border-bottom: 1px solid var(--line); min-height: 60px; }
+  .path.long .step { font-size: 13px; padding: 5px 9px; }
+  .path.long .link { width: 14px; }
+  .path .muted { margin: auto; }
+  .step { position: relative; flex: none; font-size: 15px; font-weight: 700; padding: 6px 11px; border-radius: 9px; background: #1c2027; color: var(--muted); white-space: nowrap; animation: pop .45s cubic-bezier(.2,1.4,.4,1); }
+  .step small { display: block; font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
   .step.struck { text-decoration: line-through; }
   .step.current { color: var(--text); background: #232a33; outline: 2px solid var(--text); }
-  .step.final { color: #0d0f12; background: var(--ok); }
-  .arrow { color: var(--muted); font-size: 20px; }
+  .step.final { color: #0b0d10; background: var(--ok); }
+  .step.jev { color: var(--jev); background: var(--jev-dim); outline: 1px solid rgba(183,148,244,.5); }
+  .step.warn { color: #0b0d10; background: var(--warn); }
+  .step.bad { color: #0b0d10; background: var(--bad); }
+  .link { flex: none; width: 22px; height: 2px; background: var(--line); position: relative; overflow: hidden; }
+  .link::after { content: ""; position: absolute; inset: 0; background: var(--text); transform: translateX(-100%); animation: fill .4s .05s forwards; }
 
-  .roomhead { padding: 12px 20px; font: 600 15px var(--mono); color: var(--muted); display: flex; justify-content: space-between; }
-  .room { flex: 1; overflow-y: auto; padding: 4px 20px 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-  .msg { max-width: 82%; padding: 12px 16px; border-radius: 14px; font-size: 18px; line-height: 1.4; animation: in .35s ease; }
-  .msg .who { font: 600 12px var(--mono); letter-spacing: .05em; margin-bottom: 4px; }
-  .msg.ShopperAgent { align-self: flex-start; background: var(--shopper-dim); border: 1px solid rgba(79,209,197,.35); border-bottom-left-radius: 4px; }
-  .msg.ShopperAgent .who { color: var(--shopper); }
-  .msg.MerchantAgent { align-self: flex-end; background: var(--merchant-dim); border: 1px solid rgba(246,173,85,.35); border-bottom-right-radius: 4px; }
-  .msg.MerchantAgent .who { color: var(--merchant); }
-  .mention { font-weight: 700; opacity: .7; }
-  .typing { color: var(--muted); font: 13px var(--mono); padding: 0 20px 10px; height: 24px; }
+  .roomhead { padding: 9px 18px; font: 600 13px var(--mono); color: var(--muted); display: flex; justify-content: space-between; gap: 10px; }
+  .roomhead .live { color: var(--ok); } .roomhead .sim { color: var(--warn); }
+  .room { flex: 1; overflow-y: auto; padding: 2px 18px 12px; display: flex; flex-direction: column; gap: 10px; min-height: 0; transition: flex .5s; }
+  .msg { max-width: 84%; padding: 10px 14px; border-radius: 14px; font-size: 15px; line-height: 1.4; animation: in .35s ease; }
+  .msg .who { font: 600 11px var(--mono); letter-spacing: .05em; margin-bottom: 3px; display: flex; gap: 8px; }
+  .msg .who .via { color: var(--muted); font-weight: 400; }
+  .msg.ShopperAgent { align-self: flex-start; background: var(--shopper-dim); border: 1px solid rgba(79,209,197,.32); border-bottom-left-radius: 4px; }
+  .msg.ShopperAgent .who b { color: var(--shopper); }
+  .msg.MerchantAgent { align-self: flex-end; background: var(--merchant-dim); border: 1px solid rgba(246,173,85,.32); border-bottom-right-radius: 4px; }
+  .msg.MerchantAgent .who b { color: var(--merchant); }
+  .msg.system { align-self: center; max-width: 92%; background: var(--jev-dim); border: 1px solid rgba(183,148,244,.35); font: 12px var(--mono); color: #d6c7f7; }
+  .mention { font-weight: 700; opacity: .75; }
+  .typing { color: var(--muted); font: 12px var(--mono); padding: 0 18px 6px; height: 20px; }
 
-  .offer { border-top: 1px solid var(--line); padding: 20px; text-align: center; }
-  .offer .k { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-  .price { font-size: 64px; font-weight: 800; line-height: 1.05; margin: 4px 0; }
-  .price s { font-size: 28px; color: var(--muted); font-weight: 500; margin-right: 12px; }
-  .terms { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 16px; }
-  .terms span { padding: 6px 12px; border-radius: 8px; background: #1f242c; font-size: 17px; font-weight: 600; }
+  .stage { border-top: 1px solid var(--line); padding: 16px 18px; text-align: center; background: linear-gradient(180deg, transparent, rgba(255,255,255,.015)); }
+  body.decision .room { flex: 0 0 120px; }
+  body.decision .stage { flex: 1; display: flex; flex-direction: column; justify-content: center; border-top-color: #333a45; }
+  .k { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  .price { font-size: 52px; font-weight: 800; line-height: 1.05; margin: 2px 0; letter-spacing: -.01em; }
+  .price s { font-size: 24px; color: var(--muted); font-weight: 500; margin-right: 10px; }
+  .terms { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
+  .terms span { padding: 5px 11px; border-radius: 8px; background: #1f242c; font-size: 14px; font-weight: 600; }
+  .save { color: var(--ok); font-weight: 700; font-size: 14px; margin-top: 4px; }
+
+  .decide { display: grid; grid-template-columns: 1fr 1.1fr; gap: 14px; text-align: left; animation: in .5s ease; }
+  .card { background: var(--panel2); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+  .card.agree { text-align: center; border-color: rgba(104,211,145,.35); box-shadow: 0 0 0 1px rgba(104,211,145,.08), 0 20px 50px -30px rgba(104,211,145,.45); }
+  .card.agree .price { font-size: 64px; }
+  .auth { border-color: rgba(183,148,244,.35); }
+  .auth h3 { margin: 0 0 4px; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--jev); display: flex; justify-content: space-between; align-items: center; }
+  .src { font: 10px var(--mono); letter-spacing: 0; text-transform: none; padding: 2px 7px; border-radius: 5px; }
+  .src.live { color: var(--ok); background: var(--ok-dim); } .src.fallback { color: var(--warn); background: var(--warn-dim); }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 15px; font-weight: 600; }
+  .pill { font: 700 12px var(--mono); padding: 4px 9px; border-radius: 6px; letter-spacing: .03em; }
+  .pill.pass { color: var(--ok); background: var(--ok-dim); } .pill.req { color: var(--warn); background: var(--warn-dim); } .pill.fail { color: var(--bad); background: var(--bad-dim); }
+  .verdict { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-weight: 800; font-size: 17px; letter-spacing: .03em; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+  .verdict.HUMAN_APPROVAL_REQUIRED { background: var(--warn-dim); color: var(--warn); border: 1px solid rgba(246,196,83,.4); }
+  .verdict.AUTO_APPROVE { background: var(--ok-dim); color: var(--ok); border: 1px solid rgba(104,211,145,.4); }
+  .verdict.REJECT { background: var(--bad-dim); color: var(--bad); border: 1px solid rgba(252,129,129,.4); }
+  .reason { color: #c7ced8; font-size: 13px; margin-top: 8px; }
+  .label2 { font: 11px var(--mono); color: var(--muted); margin-top: 6px; }
+  details { margin-top: 8px; font-size: 12px; color: var(--muted); }
+  details li { list-style: none; padding: 2px 0; font-family: var(--mono); }
+  details ul { margin: 6px 0 0; padding: 0; }
+  .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--jev-dim); border-top-color: var(--jev); border-radius: 50%; animation: rot .8s linear infinite; vertical-align: -2px; margin-right: 8px; }
+
   button { font: inherit; cursor: pointer; border: 0; border-radius: 12px; }
-  .cta { font-size: 24px; font-weight: 800; padding: 16px 44px; background: var(--ok); color: #0d0f12; letter-spacing: .04em; box-shadow: 0 0 0 0 rgba(104,211,145,.6); animation: pulse 1.8s infinite; }
-  .start { font-size: 22px; font-weight: 700; padding: 16px 40px; background: var(--text); color: #0d0f12; }
-  .ghost { background: none; color: var(--muted); text-decoration: underline; font-size: 15px; margin-top: 10px; }
-  .done { font-size: 28px; font-weight: 800; color: var(--ok); letter-spacing: .08em; }
-  .sim { font: 12px var(--mono); color: var(--muted); margin-top: 6px; }
-  .why { text-align: left; margin: 12px auto 0; max-width: 560px; padding: 0 0 0 20px; color: #c7ced8; font-size: 15px; }
-  .why li { margin: 4px 0; }
+  .actions { margin-top: 14px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .cta { font-size: 26px; font-weight: 800; padding: 16px 64px; background: var(--ok); color: #0b0d10; letter-spacing: .05em; animation: pulse 1.8s infinite; min-width: 380px; }
+  .cta:disabled { animation: none; opacity: .6; cursor: default; }
+  .cta kbd { font: 12px var(--mono); padding: 1px 6px; border-radius: 4px; background: rgba(0,0,0,.15); margin-left: 10px; vertical-align: 4px; }
+  .start { font-size: 20px; font-weight: 700; padding: 14px 40px; background: var(--text); color: #0b0d10; }
+  .ghost { background: none; color: var(--muted); text-decoration: underline; font-size: 14px; padding: 4px; }
+  .again { background: #232a33; color: var(--text); font-size: 15px; font-weight: 700; padding: 10px 22px; margin-top: 10px; }
+  .why { text-align: left; margin: 8px auto 0; max-width: 640px; padding: 0 0 0 18px; color: #c7ced8; font-size: 14px; }
+  .why li { margin: 3px 0; }
   .muted { color: var(--muted); }
+  .simnote { font: 11px var(--mono); color: var(--warn); margin-top: 6px; }
+
+  .done { animation: in .5s ease; }
+  .done .big { font-size: 40px; font-weight: 900; color: var(--ok); letter-spacing: .08em; }
+  .done .check { width: 64px; height: 64px; border-radius: 50%; background: var(--ok); color: #0b0d10; display: grid; place-items: center; font-size: 36px; font-weight: 900; margin: 0 auto 8px; animation: pop .6s cubic-bezier(.2,1.6,.4,1); box-shadow: 0 0 40px rgba(104,211,145,.5); }
+  .done .meta { font: 12px var(--mono); color: var(--muted); margin-top: 6px; }
+  .done .sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px auto 0; max-width: 720px; text-align: left; }
+  .done .sum div { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; color: #c7ced8; }
+  .done .sum b { display: block; color: var(--text); font-size: 15px; margin-bottom: 2px; }
+  .blocked .big { color: var(--bad); }
 
   @keyframes in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(104,211,145,.55); } 70% { box-shadow: 0 0 0 18px rgba(104,211,145,0); } 100% { box-shadow: 0 0 0 0 rgba(104,211,145,0); } }
-  @media (max-width: 1000px) { main { grid-template-columns: 1fr; height: auto; } .trace { max-height: 220px; } .room { max-height: 420px; } }
+  @keyframes pop { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
+  @keyframes fill { to { transform: none; } }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(104,211,145,.55); } 70% { box-shadow: 0 0 0 20px rgba(104,211,145,0); } 100% { box-shadow: 0 0 0 0 rgba(104,211,145,0); } }
+  @media (max-width: 1100px) { body { overflow: auto; } main { grid-template-columns: 1fr; height: auto; } .trace { max-height: 200px; } .room { max-height: 380px; } .decide { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 <header>
   <div class="brand">PACT</div>
   <div class="tag">Set the bounds. Let agents make the deal.</div>
-  <div class="chips"><span class="chip" id="dealId">no deal</span><span class="chip" id="transport">room: —</span></div>
+  <div class="chips" id="chips"><span class="chip deal" id="dealId">no deal</span></div>
 </header>
 
 <main>
   <section class="side shopper">
     <h2><span class="dot"></span>Shopper Agent</h2>
-    <div class="sub">Represents the buyer</div>
-    <div class="label">Owner's boundaries <span class="lock">PRIVATE</span></div>
+    <div class="sub">Acts for the buyer · @ShopperAgent</div>
+    <div class="label">Owner's goals &amp; bounds <span class="lock">PRIVATE</span></div>
     <dl id="shopperRules"></dl>
     <div class="label">Agent reasoning <span class="lock">PRIVATE</span></div>
     <div class="trace" id="shopperTrace"></div>
   </section>
 
   <section class="center">
-    <div class="ladder" id="ladder"><span class="muted">Negotiation not started</span></div>
-    <div class="roomhead"><span id="roomName"># negotiation room</span><span>shared · auditable</span></div>
+    <div class="path" id="path"><span class="muted">Negotiation not started</span></div>
+    <div class="roomhead"><span id="roomName"># deal room</span><span id="roomMode">shared · auditable</span></div>
     <div class="room" id="room"></div>
     <div class="typing" id="typing"></div>
-    <div class="offer" id="offer">
+    <div class="stage" id="stage">
+      <div class="k" style="margin-bottom:10px">Aria ANC Headphones · list $249</div>
       <button class="start" id="startBtn">Start negotiation</button>
     </div>
   </section>
 
   <section class="side merchant">
     <h2><span class="dot"></span>Merchant Agent</h2>
-    <div class="sub">Represents the store</div>
+    <div class="sub">Acts for the store · @MerchantAgent</div>
     <div class="label">Merchant rules <span class="lock">PRIVATE</span></div>
     <dl id="merchantRules"></dl>
     <div class="label">Agent reasoning &amp; tools <span class="lock">PRIVATE</span></div>
@@ -118,21 +179,48 @@
 
 <script>
 const $ = id => document.getElementById(id);
-const pace = new URLSearchParams(location.search).get("pace") || "1.2";
-let deal = null, source = null, listPrice = 249, lastWhy = [];
+const qs = new URLSearchParams(location.search);
+const pace = qs.get("pace") || "0.8";
+const dealParam = qs.get("id") || "deal-1842";
+let deal = null, source = null, listPrice = 249, why = [], agreement = null, authority = null, integrations = [];
 
-const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const money = n => "$" + Math.round(n);
 const shipLabel = s => s === "free_next_day" ? "Free next-day" : "Standard shipping";
 const day = iso => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" });
-const cap = s => s[0].toUpperCase() + s.slice(1);
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : "";
+const LABEL = { AUTO_APPROVE: "AUTO-APPROVE", HUMAN_APPROVAL_REQUIRED: "HUMAN APPROVAL REQUIRED", REJECT: "REJECT" };
+
+// ---- integration badges ------------------------------------------------------
+function renderChips(list, room) {
+  if (list) integrations = list;
+  const chips = integrations.map(i => {
+    let mode = i.mode, detail = i.detail;
+    if (i.name === "BAND" && room) {
+      mode = room.live ? "live" : "fallback";
+      detail = room.live ? `${room.transport} · room ${room.chat_id} · ${room.ws_delivered ?? 0} delivered via WebSocket`
+                         : `${room.transport}${room.error ? " · " + room.error : ""}`;
+    }
+    return `<span class="chip ${mode === "live" ? "live" : "fallback"}" title="${esc(detail)}"><i></i><b>${esc(i.name)}</b>${mode === "live" ? "LIVE" : "SIMULATED"}</span>`;
+  });
+  $("chips").innerHTML = `<span class="chip deal" id="dealId">${esc(deal ? "#" + deal.id.toUpperCase() : "no deal")}</span>` + chips.join("");
+}
+
+function renderRoomMode(room) {
+  if (!room) return;
+  $("roomName").textContent = room.title || "# deal room";
+  $("roomMode").innerHTML = room.live
+    ? `<span class="live">● BAND live</span> · ${room.posted ?? 0} msgs · ${room.ws_delivered ?? 0} via WebSocket${room.local_delivered ? ` · ${room.local_delivered} local fallback` : ""}`
+    : `<span class="sim">● ${esc(room.transport)}</span> · not on BAND`;
+  renderChips(null, room);
+}
 
 function renderRules(snap) {
   const s = snap.shopper, m = snap.merchant;
   $("shopperRules").innerHTML = [
     ["Max price", money(s.max_price)],
     ["Preferred", cap(s.preferred_variant)],
-    ["Acceptable", s.fallback_variants.map(cap).join(", ") + ` (if ${s.fallback_return_days}-day returns)`],
+    ["Also OK", s.fallback_variants.map(cap).join(", ") + ` (if ${s.fallback_return_days}-day returns)`],
     ["Deliver by", day(s.delivery_deadline)],
     ["Min returns", s.minimum_return_days + " days"],
     ["Ask me above", money(s.approval_required_above)],
@@ -142,68 +230,120 @@ function renderRules(snap) {
     ["Min margin", m.min_margin_pct + "%"],
     ["Auto-discount cap", m.max_auto_discount_pct + "%"],
     ["Inventory", Object.entries(m.inventory).map(([k, v]) => `${cap(k)} ${v}`).join(" · ")],
+    ["Floors", Object.entries(m.variant_floor).map(([k, v]) => `${cap(k)} ≥ ${money(v)}`).join(" · ") || "—"],
     ["Move", m.overstock.map(cap).join(", ")],
     ["Max returns", m.max_return_days + " days"],
   ].map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
 }
 
-// ---- price ladder -------------------------------------------------------
-let ladder = [];
-function pushStep(main, sub, cls = "") {
-  ladder.forEach(s => s.cls = s.cls.replace("current", "").trim());
-  ladder.push({ main, sub, cls: cls || "current" });
-  $("ladder").innerHTML = ladder.map((s, i) =>
-    (i ? '<span class="arrow">→</span>' : "") +
+// ---- animated price path ------------------------------------------------------
+let steps = [];
+function pushStep(main, sub, cls = "current") {
+  steps.forEach(s => s.cls = s.cls.replace("current", "").trim());
+  steps.push({ main, sub, cls });
+  const html = steps.map((s, i) => (i ? '<span class="link"></span>' : "") +
     `<div class="step ${s.cls}">${esc(s.main)}${s.sub ? `<small>${esc(s.sub)}</small>` : ""}</div>`).join("");
+  $("path").innerHTML = html;
+  $("path").classList.toggle("long", steps.length > 6);
 }
-
-// ---- offer card ---------------------------------------------------------
-function showOffer(o, heading) {
-  $("offer").innerHTML = `<div class="k">${heading}</div>
+// ---- stage --------------------------------------------------------------------
+function offerHTML(o, heading, savings) {
+  return `<div class="k">${esc(heading)}</div>
     <div class="price"><s>${money(listPrice)}</s>${money(o.price)}</div>
-    <div class="terms"><span>${cap(o.variant)}</span><span>${shipLabel(o.shipping)}</span><span>${o.return_window_days}-day returns</span></div>`;
+    <div class="terms"><span>${cap(o.variant)}</span><span>${shipLabel(o.shipping)}</span><span>${o.return_window_days}-day returns</span></div>
+    ${savings ? `<div class="save">Shopper saves ${money(savings)}</div>` : ""}`;
+}
+function showOffer(o, heading) { $("stage").innerHTML = offerHTML(o, heading); }
+
+function authorityHTML(d) {
+  if (!d) return `<div class="card auth"><h3>Authority check · Jev</h3>
+      <div style="padding:26px 0;text-align:center;color:var(--jev)"><span class="spin"></span>Jev checking authority…</div>
+      <div class="label2">Deterministic gate · AUTO_APPROVE / HUMAN_APPROVAL_REQUIRED / REJECT</div></div>`;
+  const live = d.source === "jev";
+  const shopperPill = d.shopper_policy_ok ? `<span class="pill pass">PASS</span>`
+    : d.decision === "REJECT" && (d.checks || []).some(c => c.side === "shopper" && !c.ok && c.rule !== "Auto-approval threshold")
+      ? `<span class="pill fail">FAIL</span>` : `<span class="pill req">APPROVAL REQUIRED</span>`;
+  const checks = (d.checks || []).map(c => `<li>${c.ok ? "✓" : "✗"} ${esc(cap(c.side || ""))} · ${esc(c.rule)} — ${esc(c.detail)}</li>`).join("");
+  return `<div class="card auth">
+    <h3>Authority check · Jev<span class="src ${live ? "live" : "fallback"}">${live ? "LIVE" : "FALLBACK"}</span></h3>
+    <div class="row"><span>Merchant rules</span>${d.merchant_policy_ok ? `<span class="pill pass">PASS</span>` : `<span class="pill fail">FAIL</span>`}</div>
+    <div class="row"><span>Shopper rules</span>${shopperPill}</div>
+    <div class="verdict ${d.decision}"><span>${LABEL[d.decision] || d.decision}</span><span style="font-size:20px">${d.decision === "AUTO_APPROVE" ? "✓" : d.decision === "REJECT" ? "⛔" : "✋"}</span></div>
+    <div class="reason">${esc(d.reason)}</div>
+    <div class="label2">${esc(d.source_label || "")}</div>
+    ${checks ? `<details><summary>${(d.checks || []).length} rules evaluated</summary><ul>${checks}</ul></details>` : ""}
+  </div>`;
 }
 
-function showAgreement(a, why) {
-  const t = a.terms;
-  showOffer(t, "Agreement ready · saves " + money(a.shopper_savings));
-  $("offer").insertAdjacentHTML("beforeend",
-    `<button class="cta" id="approveBtn">APPROVE ${money(t.price)}</button>
-     <div><button class="ghost" id="whyBtn">Why this deal?</button></div><div id="whyBox"></div>`);
-  $("approveBtn").onclick = approve;
-  $("whyBtn").onclick = () => toggleWhy(why);
+function showDecision() {
+  document.body.classList.add("decision");
+  const t = agreement.terms;
+  const canApprove = authority && authority.decision === "HUMAN_APPROVAL_REQUIRED" && deal.status === "awaiting_approval";
+  $("stage").innerHTML = `<div class="decide">
+      <div class="card agree">${offerHTML(t, "Agreement ready · both agents signed", agreement.shopper_savings)}
+        <div class="label2" style="text-align:center">Arrives ${esc(day(t.delivery_date))} · ${esc(deal.id)}</div></div>
+      ${authorityHTML(authority)}
+    </div>
+    <div class="actions">
+      ${canApprove ? `<button class="cta" id="approveBtn">APPROVE ${money(t.price)}<kbd>A</kbd></button>
+        <div class="muted" style="font-size:13px">Your agent paused here: ${esc(authority.reason.toLowerCase())}.</div>` : ""}
+      <button class="ghost" id="whyBtn">Why this deal?</button><div id="whyBox"></div>
+    </div>`;
+  if (canApprove) $("approveBtn").onclick = approve;
+  $("whyBtn").onclick = toggleWhy;
 }
 
-function toggleWhy(why) {
+function toggleWhy() {
   const box = $("whyBox");
   box.innerHTML = box.innerHTML ? "" : `<ul class="why">${why.map(w => `<li>${esc(w)}</li>`).join("")}</ul>`;
 }
 
-function showComplete(a, exec) {
-  const t = a.terms;
-  $("offer").innerHTML = `<div class="done">✓ TRANSACTION COMPLETE</div>
-    <div class="terms" style="margin-top:12px"><span>${money(t.price)}</span><span>${cap(t.variant)}</span>
-      <span>${shipLabel(t.shipping)}</span><span>${t.return_window_days}-day returns</span></div>
-    <div>Shopper saved <b>${money(a.shopper_savings)}</b> · Merchant kept margin above floor and moved overstock</div>
-    <div class="sim">order ${esc(exec?.order_id || "")} · execution simulated (no real payment)</div>
-    <div><button class="ghost" id="whyBtn">Why this deal?</button></div><div id="whyBox"></div>`;
-  $("whyBtn").onclick = () => toggleWhy(lastWhy);
+function showComplete(e) {
+  document.body.classList.add("decision");
+  const t = e.agreement.terms, x = e.execution || {};
+  const when = x.approved_at ? new Date(x.approved_at * 1000).toLocaleTimeString() : "";
+  $("stage").innerHTML = `<div class="done">
+      <div class="check">✓</div>
+      <div class="big">TRANSACTION COMPLETE</div>
+      <div class="terms"><span>${money(t.price)}</span><span>${cap(t.variant)}</span><span>${shipLabel(t.shipping)}</span><span>${t.return_window_days}-day returns</span></div>
+      <div class="meta">order ${esc(x.order_id)} · approved by ${x.approved_by === "human" ? "the shopper's human" : "policy (auto-approve)"} ${when ? "at " + when : ""}</div>
+      ${x.simulated ? `<div class="simnote">Checkout &amp; inventory reservation are simulated — no real payment was taken.</div>` : ""}
+      <div class="sum">
+        <div><b>Shopper</b>Saved ${money(e.agreement.shopper_savings)} · inside every bound · approved the exception</div>
+        <div><b>Merchant</b>Kept margin above floor · moved overstocked ${esc(t.variant)}</div>
+        <div><b>Jev</b>${esc(LABEL[(e.authority || {}).decision] || "—")} · ${esc((e.authority || {}).source === "jev" ? "live" : "local rules (fallback)")}</div>
+      </div>
+      <div class="actions"><button class="ghost" id="whyBtn">Why this deal?</button><div id="whyBox"></div>
+        <button class="again" id="againBtn">↻ Run again</button></div>
+    </div>`;
+  $("whyBtn").onclick = toggleWhy;
+  $("againBtn").onclick = start;
 }
 
-// ---- events -------------------------------------------------------------
+function showBlocked(e) {
+  document.body.classList.add("decision");
+  $("stage").innerHTML = `<div class="done blocked">
+      <div class="big">DEAL BLOCKED</div>
+      <div class="reason" style="font-size:16px;margin:8px 0">${esc(e.reason)}</div>
+      ${e.authority ? `<div class="decide" style="grid-template-columns:1fr;max-width:520px;margin:0 auto">${authorityHTML(e.authority)}</div>` : ""}
+      <div class="actions"><button class="again" id="againBtn">↻ Run again</button></div></div>`;
+  $("againBtn").onclick = start;
+}
+
+// ---- events -------------------------------------------------------------------
 function onMessage(m) {
   const text = esc(m.text).replace(/@(\w+Agent)/g, '<span class="mention">@$1</span>');
+  const via = deal?.room?.live ? "via BAND" : "local";
   $("room").insertAdjacentHTML("beforeend",
-    `<div class="msg ${m.sender}"><div class="who">@${m.sender}</div>${text}</div>`);
+    `<div class="msg ${m.sender}"><div class="who"><b>@${m.sender}</b><span class="via">${via}</span></div>${text}</div>`);
   $("room").scrollTop = $("room").scrollHeight;
   $("typing").textContent = "";
 
   const p = m.payload || {};
-  if (p.kind === "proposal") pushStep(money(p.requested_price), "shopper asks", "");
+  if (p.kind === "proposal") pushStep(money(p.requested_price), "shopper asks");
   if (p.kind === "counteroffer") {
     p.offers.forEach(o => pushStep(money(o.price) + (o.shipping === "free_next_day" ? " + free ship" : ""), o.variant));
-    const best = p.offers[p.offers.length - 1];
-    showOffer(best, "Current offer");
+    showOffer(p.offers[p.offers.length - 1], "Current offer");
   }
   if (p.kind === "conditional_accept" && p.conditions.return_window_days)
     pushStep(p.conditions.return_window_days + "-day returns", "shopper's condition");
@@ -214,47 +354,78 @@ function onTrace(e) {
   const box = $(e.side + "Trace");
   box.insertAdjacentHTML("beforeend", `<div class="${e.kind}">${esc(e.text)}</div>`);
   box.scrollTop = box.scrollHeight;
-  $("typing").textContent = (e.side === "shopper" ? "ShopperAgent" : "MerchantAgent") + " is thinking…";
+  if (deal.status === "negotiating") $("typing").textContent = (e.side === "shopper" ? "ShopperAgent" : "MerchantAgent") + " is thinking…";
+}
+
+function onPhase(e) {
+  if (e.phase !== "negotiating") $("typing").textContent = "";
+  if (e.phase === "checking_authority") {
+    deal.status = "checking_authority";
+    agreement = e.agreement;
+    pushStep("AGREEMENT", "both signed", "final");
+    pushStep("JEV CHECK", "authority gate", "jev");
+    showDecision();
+  }
+}
+
+function onAuthority(e) {
+  authority = e.decision;
+  const cls = { AUTO_APPROVE: "final", HUMAN_APPROVAL_REQUIRED: "warn", REJECT: "bad" }[authority.decision];
+  pushStep(LABEL[authority.decision], authority.source === "jev" ? "jev live" : "local rules", cls);
+  $("room").insertAdjacentHTML("beforeend",
+    `<div class="msg system">⚖ Authority check · ${esc(LABEL[authority.decision])} — ${esc(authority.reason)}${deal?.room?.live ? " · posted to BAND room as event" : ""}</div>`);
+  $("room").scrollTop = $("room").scrollHeight;
 }
 
 function onStatus(e) {
-  if (e.status === "awaiting_approval") {
-    lastWhy = e.why || [];
-    pushStep("AGREEMENT", "awaiting you", "final");
-    showAgreement(e.agreement, lastWhy);
-  }
-  if (e.status === "complete") showComplete(e.agreement, e.execution);
+  deal.status = e.status;
+  if (e.why) why = e.why;
+  if (e.status === "awaiting_approval") { agreement = e.agreement; authority = e.authority || authority; showDecision(); }
+  if (e.status === "complete") { pushStep("TRANSACTION COMPLETE", e.execution?.simulated ? "simulated checkout" : "executed", "final"); showComplete(e); }
+  if (e.status === "failed") { pushStep("BLOCKED", "", "bad"); showBlocked(e); }
 }
 
 async function start() {
-  const res = await fetch(`/api/deals?pace=${pace}`, { method: "POST" });
+  if (source) source.close();
+  document.body.classList.remove("decision");
+  agreement = authority = null; why = []; steps = [];
+  ["room", "shopperTrace", "merchantTrace"].forEach(id => $(id).innerHTML = "");
+  $("stage").innerHTML = `<div class="k"><span class="spin"></span>Opening deal room…</div>`;
+  const res = await fetch(`/api/deals?pace=${pace}&id=${encodeURIComponent(dealParam)}`, { method: "POST" });
   deal = await res.json();
   listPrice = deal.product.list_price;
-  $("dealId").textContent = deal.id.toUpperCase();
-  $("roomName").textContent = "# " + deal.id;
-  $("transport").textContent = "room: " + deal.transport;
-  $("transport").classList.toggle("live", !deal.transport.includes("simulated"));
+  renderChips(deal.integrations, deal.room);
+  renderRoomMode(deal.room);
   renderRules(deal);
-  ladder = [];
   pushStep(money(listPrice), "list price", "struck");
-  $("offer").innerHTML = `<div class="k">Agents negotiating…</div>`;
+  $("stage").innerHTML = `<div class="k">Agents negotiating in ${esc(deal.room?.title || deal.id)}…</div>`;
   source = new EventSource(`/api/deals/${deal.id}/events`);
   source.onmessage = ev => {
     const e = JSON.parse(ev.data);
     if (e.type === "message") onMessage(e.message);
     else if (e.type === "trace") onTrace(e);
+    else if (e.type === "phase") onPhase(e);
+    else if (e.type === "authority") onAuthority(e);
+    else if (e.type === "room") { deal.room = e.room; renderRoomMode(e.room); }
     else if (e.type === "status") onStatus(e);
   };
 }
 
 async function approve() {
-  $("approveBtn").disabled = true;
-  await fetch(`/api/deals/${deal.id}/approve`, { method: "POST" });
+  const b = $("approveBtn");
+  if (!b || b.disabled) return;
+  b.disabled = true; b.textContent = "Approving…";
+  const r = await fetch(`/api/deals/${deal.id}/approve`, { method: "POST" });
+  if (!r.ok) { b.textContent = "Approval failed"; }
 }
 
+document.addEventListener("keydown", e => {
+  if (e.key === "a" && $("approveBtn")) approve();
+  if (e.key === "Enter" && $("startBtn")) start();
+});
 $("startBtn").onclick = start;
-// Show the rules before starting so the presenter can walk through them.
 fetch(`/api/scenario`).then(r => r.ok ? r.json() : null).then(s => s && renderRules(s));
+fetch(`/api/integrations`).then(r => r.ok ? r.json() : null).then(l => l && renderChips(l));
 </script>
 </body>
 </html>
