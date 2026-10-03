@@ -1,0 +1,12 @@
+.env
+.env.*
+.history/
+.venv/
+.git/
+.pytest_cache/
+.local/
+creative/
+tests/
+preview.jpg
+workspace-preview.jpg
+dist/

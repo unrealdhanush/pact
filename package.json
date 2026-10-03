@@ -1,0 +1,5 @@
+{
+  "name": "pact-demo",
+  "private": true,
+  "scripts": { "build": "node scripts/build-vercel.mjs" }
+}

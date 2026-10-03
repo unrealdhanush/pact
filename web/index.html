@@ -308,7 +308,7 @@ a.brand:focus-visible { outline:2px solid var(--shopper); outline-offset:4px; bo
 const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
 const pace = qs.get("pace") || "0.8";
-const dealParam = qs.get("id") || "deal-1842";
+const dealParam = qs.get("id") || `deal-${1000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 9000)}`;
 let demoProduct = "sony-wh1000xm5", boundarySaving = false, demoChoosing = false;
 let deal = null, source = null, listPrice = 0, why = [], agreement = null, authority = null, integrations = [];
 
