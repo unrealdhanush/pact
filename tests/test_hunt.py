@@ -72,3 +72,19 @@ async def test_far_over_budget_walks_away_without_asking(monkeypatch):
     h = await _near_miss_hunt(monkeypatch, 250)  # $299.99 is 20% over -> code rule: walk away
     assert h.status == "failed" and not any(e["type"] == "status" and e["status"] == "awaiting_exception"
                                             for e in h.events)
+
+
+async def test_order_tracking_after_execution():
+    h = Hunt(pace=0, preference="fastest")
+    await h.setup()
+    await h.run()
+    await settle(h)
+    h.approve()
+    for _ in range(200):
+        if sum(e["type"] == "tracking" for e in h.events) == 5:
+            break
+        await asyncio.sleep(0.01)
+    stages = [e["stage"] for e in h.events if e["type"] == "tracking"]
+    assert stages == ["confirmed", "packed", "shipped", "out_for_delivery", "delivered"]
+    last = [e for e in h.events if e["type"] == "tracking"][-1]
+    assert last["simulated"] and last["date"] == h.agreement.terms.delivery_date.isoformat()

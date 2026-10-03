@@ -8,6 +8,7 @@ def _no_live_services(monkeypatch):
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
     monkeypatch.delenv("JEV_API_KEY", raising=False)
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.setenv("PACT_TRACKING_STEP_S", "0")
     for k in ("BAND_SHOPPER_AGENT_KEY", "BAND_MERCHANT_AGENT_KEY", "BAND_API_KEY", "BAND_HUMAN_API_KEY"):
         monkeypatch.delenv(k, raising=False)  # tests never touch live BAND
     for k in ("MOSS_PROJECT_ID", "MOSS_PROJECT_KEY"):

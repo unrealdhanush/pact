@@ -22,7 +22,7 @@ from .scenario import ShopperState
 log = logging.getLogger("pact.hunt")
 
 PREFERENCES = ("best", "cheapest", "fastest")
-CHILD_ALWAYS = {"message", "trace", "room", "memory", "near_miss"}  # forwarded from every room
+CHILD_ALWAYS = {"message", "trace", "room", "memory", "near_miss", "tracking"}  # forwarded from every room
 CHILD_WINNER = {"phase", "authority", "status"}  # forwarded only from the winning room
 NEGOTIATION_TIMEOUT_S = 90
 
@@ -170,8 +170,13 @@ class Hunt:
             e = await q.get()
             t = e["type"]
             if t in CHILD_ALWAYS or (t in CHILD_WINNER and deal is self.winner):
-                self.emit(t, **{k: v for k, v in e.items() if k not in ("type", "ts")}, merchant=merchant,
-                          merchant_name=name)
+                try:
+                    data = {k: v for k, v in e.items() if k not in ("type", "ts")}
+                    data.setdefault("merchant", merchant)
+                    data.setdefault("merchant_name", name)
+                    self.emit(t, **data)
+                except Exception:  # noqa: BLE001 - one bad event must not stop this room's stream
+                    log.exception("could not forward %s event from %s", t, merchant)
 
     async def run(self) -> None:
         self.emit("status", status="negotiating")

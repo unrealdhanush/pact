@@ -298,7 +298,36 @@ class Deal:
                 f"{' (simulated — no real payment)' if self.execution['simulated'] else ''}.",
                 "task", {"order_id": checkout["order_id"], "approved_by": approved_by,
                          "simulated": self.execution["simulated"]}))
+        self._spawn(self._track(checkout["order_id"]))
         return checkout
+
+    async def _track(self, order_id: str) -> None:
+        """Post-purchase tracking (simulated carrier, sped-up demo clock). The merchant agent posts each
+        update into the same BAND room, so the deal and its fulfilment share one auditable thread."""
+        from datetime import date, datetime, timedelta
+        t = self.agreement.terms
+        tracking_no = f"PCT{abs(hash(order_id)) % 10**9:09d}"
+        ship_day = date.today() if t.shipping == "free_next_day" else date.today() + timedelta(days=1)
+        stages = [
+            ("confirmed", f"Order {order_id} confirmed by {self.merchant_info['name']}", date.today()),
+            ("packed", "Packed at the warehouse", date.today()),
+            ("shipped", f"Shipped · {'next-day air' if t.shipping == 'free_next_day' else 'ground'} · {tracking_no}", ship_day),
+            ("out_for_delivery", "Out for delivery", t.delivery_date),
+            ("delivered", f"Delivered · {t.return_window_days}-day return window starts", t.delivery_date),
+        ]
+        step = float(os.environ.get("PACT_TRACKING_STEP_S", "6"))
+        for i, (key, label, when) in enumerate(stages):
+            if i:
+                await asyncio.sleep(step)
+            self.emit("tracking", stage=key, index=i, total=len(stages), label=label, date=when.isoformat(),
+                      tracking_no=tracking_no, merchant_name=self.merchant_info["name"], simulated=True)
+            if self.room is not None:
+                try:
+                    await self.room.post_event(f"Tracking {tracking_no}: {label} ({when:%a %b %-d})", "task",
+                                               {"order_id": order_id, "stage": key, "simulated": True},
+                                               sender="MerchantAgent")
+                except Exception as e:  # noqa: BLE001 - tracking is best-effort
+                    log.warning("tracking event failed: %s", e)
 
 
 def _jsonable(d: dict) -> dict:

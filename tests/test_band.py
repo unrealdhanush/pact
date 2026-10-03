@@ -118,7 +118,8 @@ async def test_live_band_room_carries_the_whole_negotiation():
     assert events and "HUMAN_APPROVAL_REQUIRED" in events[0][3]["event"]["content"]
     deal.approve()
     await asyncio.sleep(0.02)
-    assert "Approved by the shopper's human" in [c for c in fake.calls if c[1].endswith("/events")][-1][3]["event"]["content"]
+    assert any("Approved by the shopper's human" in c[3]["event"]["content"]
+               for c in fake.calls if c[1].endswith("/events"))  # tracking updates follow the approval
 
 
 async def test_missing_socket_delivery_falls_back_locally_and_is_counted():

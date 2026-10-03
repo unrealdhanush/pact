@@ -96,6 +96,16 @@
   .quotes { width: 100%; border-collapse: collapse; margin-top: 6px; font: 12px var(--mono); }
   .quotes td { padding: 3px 6px; border-top: 1px dashed #2a2f37; text-align: left; }
   .quotes tr.win td { color: var(--ok, #68d391); font-weight: 700; }
+  .track { margin: 14px auto 4px; max-width: 560px; text-align: left; }
+  .track .steps { list-style: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 0; margin: 10px 0 6px; }
+  .track .steps li { position: relative; padding-top: 18px; font-size: 12px; color: var(--muted); }
+  .track .steps li::before { content: ""; position: absolute; top: 6px; left: 0; right: 0; height: 2px; background: var(--line); }
+  .track .steps li.done::before, .track .steps li.now::before { background: var(--shopper); }
+  .track .dotc { position: absolute; top: 1px; left: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--panel); border: 2px solid var(--line); }
+  .track li.done .dotc { background: var(--shopper); border-color: var(--shopper); }
+  .track li.now .dotc { background: var(--panel); border-color: var(--shopper); box-shadow: 0 0 0 4px var(--shopper-dim); animation: pulse 1.4s infinite; }
+  .track li b { display: block; color: var(--text); font-weight: 600; } .track li small { font: 11px var(--mono); }
+  .track .tl { font-size: 13px; color: #b8c0cc; }
   .chips2 { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 2px 0 8px; }
   .chip2 { font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); background: #12151a; color: var(--muted); cursor: pointer; }
   .chip2.on { color: #0d0f12; background: var(--shopper); border-color: var(--shopper); font-weight: 600; }
@@ -372,6 +382,7 @@ function showComplete(e) {
         <div><b>Merchant</b>Kept margin above floor · moved overstocked ${esc(t.variant)}</div>
         <div><b>Jev</b>${esc(LABEL[(e.authority || {}).decision] || "—")} · ${esc((e.authority || {}).source === "jev" ? "live" : "local rules (fallback)")}</div>
       </div>
+      <div class="track" id="track"></div>
       <div class="actions"><button class="ghost" id="whyBtn">Why this deal?</button><div id="whyBox"></div>
         <button class="again" id="againBtn">↻ Run again</button></div>
     </div>`;
@@ -455,7 +466,7 @@ function onStatus(e) {
 async function start(intakeId = null) {
   if (source) source.close();
   document.body.classList.remove("decision");
-  agreement = authority = null; why = []; steps = []; askedOnce = false;
+  agreement = authority = null; why = []; steps = []; askedOnce = false; tracking = {};
   ["room", "shopperTrace", "merchantTrace"].forEach(id => $(id).innerHTML = "");
   $("stage").innerHTML = `<div class="k"><span class="spin"></span>Opening deal room…</div>`;
   const res = await fetch(`/api/deals?pace=${pace}&id=${encodeURIComponent(dealParam)}` +
@@ -472,6 +483,7 @@ async function start(intakeId = null) {
     const e = JSON.parse(ev.data);
     if (e.type === "message") onMessage(e.message, e.merchant_name);
     else if (e.type === "quotes") onQuotes(e);
+    else if (e.type === "tracking") onTracking(e);
     else if (e.type === "near_miss" && e.decision?.decision === "WALK_AWAY")
       $("room").insertAdjacentHTML("beforeend", `<div class="msg system">${esc(e.merchant_name)}: best offer ${money(e.offer.price)} is ${money(e.over_by)} over budget → walk away (${esc(e.decision.reason)})</div>`);
     else if (e.type === "trace") onTrace(e);
@@ -531,6 +543,19 @@ function showException(x) {
     .then(() => { $("stage").innerHTML = `<div class="k"><span class="spin"></span>${accept ? "Telling the merchant…" : "Walking away…"}</div>`; });
   $("excYes").onclick = () => answer(true);
   $("excNo").onclick = () => answer(false);
+}
+const TRACK_STAGES = ["confirmed", "packed", "shipped", "out_for_delivery", "delivered"];
+const TRACK_LABEL = { confirmed: "Confirmed", packed: "Packed", shipped: "Shipped", out_for_delivery: "Out for delivery", delivered: "Delivered" };
+let tracking = {};
+function onTracking(e) {
+  tracking[e.stage] = e;
+  const box = $("track"); if (!box) return;
+  const reached = TRACK_STAGES.filter(k => tracking[k]).length;
+  const last = tracking[TRACK_STAGES[reached - 1]];
+  box.innerHTML = `<div class="k">Order tracking · ${esc(e.merchant_name || "")} · ${esc(e.tracking_no)} <span class="src default">SIMULATED</span></div>
+    <ol class="steps">${TRACK_STAGES.map((k, i) => `<li class="${i < reached - 1 ? "done" : i === reached - 1 ? "now" : ""}">
+      <span class="dotc"></span><b>${TRACK_LABEL[k]}</b><small>${tracking[k] ? day(tracking[k].date) : ""}</small></li>`).join("")}</ol>
+    <div class="tl">${esc(last.label)}${deal?.room?.live ? " · posted to the BAND deal room" : ""}</div>`;
 }
 function onQuotes(e) {
   const rows = e.quotes.map(q => q.failed
