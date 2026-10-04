@@ -11,6 +11,7 @@ dependencies = [
     "python-dotenv>=1.2.4",
     "band-sdk>=4.0.0",
     "moss>=1.14.0 ; sys_platform == 'darwin'",
+    "redis>=5",
 ]
 
 [dependency-groups]

@@ -29,14 +29,35 @@ def _cfg() -> tuple[str, str] | None:
     return (url.rstrip("/"), token) if url and token else None
 
 
+def _redis_url() -> str | None:
+    return os.environ.get("REDIS_URL") or os.environ.get("KV_URL")
+
+
 def enabled() -> bool:
-    return _cfg() is not None
+    return _cfg() is not None or _redis_url() is not None
+
+
+_client = None
+
+
+async def _redis_pipeline(cmds: list[list]) -> list:
+    """Redis protocol (REDIS_URL), for providers without a REST API."""
+    global _client
+    import redis.asyncio as aioredis
+    if _client is None:
+        _client = aioredis.from_url(_redis_url(), decode_responses=True, socket_timeout=10)
+    pipe = _client.pipeline(transaction=False)
+    for c in cmds:
+        pipe.execute_command(*[str(a) for a in c])
+    return await pipe.execute()
 
 
 async def pipeline(cmds: list[list]) -> list:
     cfg = _cfg()
-    if not cfg or not cmds:
+    if not cmds:
         return []
+    if not cfg:
+        return await _redis_pipeline(cmds) if _redis_url() else []
     async with httpx.AsyncClient(timeout=10) as http:
         r = await http.post(f"{cfg[0]}/pipeline", headers={"Authorization": f"Bearer {cfg[1]}"},
                             json=[[str(a) for a in c] for c in cmds])
@@ -130,6 +151,11 @@ async def load_intake(intake_id: str) -> dict | None:
 
 
 def status() -> dict:
+    seen = sorted(k for k in os.environ if any(t in k for t in ("REDIS", "KV_", "UPSTASH")))  # names only
     if enabled():
-        return {"name": "State", "mode": "live", "detail": f"Shared deal state in Redis (instance {INSTANCE})"}
-    return {"name": "State", "mode": "fallback", "detail": "In-process deal state (single server)"}
+        via = "REST" if _cfg() else "redis://"
+        return {"name": "State", "mode": "live", "detail": f"Shared deal state in Redis via {via} (instance {INSTANCE})",
+                "env": seen}
+    return {"name": "State", "mode": "fallback",
+            "detail": "In-process deal state (single server)" + (f" — saw {', '.join(seen)}" if seen else
+                                                                 " — no Redis env vars present"), "env": seen}
