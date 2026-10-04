@@ -20,6 +20,7 @@ from .deal import DealStore, _jsonable  # noqa: E402
 from .engine import money  # noqa: E402
 from .intake import IntakeStore  # noqa: E402
 from .memory import memory  # noqa: E402
+from . import shared  # noqa: E402
 from .scenario import MerchantState, Product, ShopperState, merchant_state, product  # noqa: E402
 
 WEB = ROOT / "web"
@@ -44,7 +45,7 @@ OPTIONAL_ADAPTERS = {
 
 
 def integrations() -> list[dict]:
-    out = [band.integration_status()]
+    out = [band.integration_status(), shared.status()]
     for name, (module, fallback) in OPTIONAL_ADAPTERS.items():
         try:
             status = importlib.import_module(module).integration_status()
@@ -97,20 +98,25 @@ async def intake(body: dict):
     text = str(body.get("text", "")).strip()
     if not text:
         raise HTTPException(422, "text is required")
-    return await intakes.get_or_new(body.get("intake_id")).turn(text)
+    it = await intakes.get(body.get("intake_id")) or intakes.get_or_new(None)
+    view = await it.turn(text)
+    await intakes.save(it)
+    return view
 
 
 @app.post("/api/intake/{intake_id}/choose")
 async def choose_product(intake_id: str, body: dict):
     """The human picks a product card and (optionally) their max price."""
-    it = intakes.items.get(intake_id)
+    it = await intakes.get(intake_id)
     if it is None:
         raise HTTPException(404, "unknown intake")
     try:
-        return await it.choose(str(body.get("product_id", "")), body.get("max_price"),
+        view = await it.choose(str(body.get("product_id", "")), body.get("max_price"),
                                body.get("approval_required_above"))
     except ValueError as e:
         raise HTTPException(409, str(e))
+    await intakes.save(it)
+    return view
 
 
 async def _remember_outcome(deal) -> None:
@@ -137,7 +143,7 @@ async def create_deal(pace: float = 1.2, id: str | None = None, intake: str | No
         raise HTTPException(422, "id must look like deal-1842")
     shopper_state, on_complete, product_id = None, None, "sony-wh1000xm5"
     if intake:
-        it = intakes.items.get(intake)
+        it = await intakes.get(intake)
         if it is None or not it.product or not it.product.get("carried"):
             raise HTTPException(409, "intake is not ready: no product this merchant carries")
         shopper_state, on_complete, product_id = it.shopper_state(), _remember_outcome, it.product["product_id"]
@@ -147,6 +153,7 @@ async def create_deal(pace: float = 1.2, id: str | None = None, intake: str | No
         shopper_state.priorities = [p for p in prio.split(",") if p in ("price", "colour", "speed", "returns")]
     deal = await store.create(pace=pace, deal_id=id, shopper_state=shopper_state, on_complete=on_complete,
                               product_id=product_id, shop_around=bool(shop), preference=prefer)
+    shared.attach(deal, _apply)  # serverless: mirror to Redis, take actions queued by other instances
     return {**deal.snapshot(), "integrations": integrations(),
             "intake": intakes.items[intake].view("")["fields"] if intake else None}
 
@@ -159,14 +166,37 @@ def _get(deal_id: str):
 
 
 @app.get("/api/deals/{deal_id}")
-def get_deal(deal_id: str):
-    deal = _get(deal_id)
-    return {**deal.snapshot(), "events": deal.events}
+async def get_deal(deal_id: str):
+    deal = store.deals.get(deal_id)
+    if deal:
+        return {**deal.snapshot(), "events": deal.events}
+    snap = await shared.snapshot(deal_id) if shared.enabled() else None
+    if snap is None:
+        raise HTTPException(404, "Unknown deal")
+    return snap
 
 
 @app.get("/api/deals/{deal_id}/events")
 async def deal_events(deal_id: str):
-    deal = _get(deal_id)
+    deal = store.deals.get(deal_id)
+    if deal is None:
+        if not (shared.enabled() and await shared.exists(deal_id)):
+            raise HTTPException(404, "Unknown deal")
+
+        async def relay():  # another instance runs this deal: stream its mirrored events from Redis
+            sent, idle = 0, 0.0
+            while True:
+                batch = await shared.events_from(deal_id, sent)
+                for e in batch:
+                    yield f"data: {json.dumps(e, default=str)}\n\n"
+                sent += len(batch)
+                idle = 0.0 if batch else idle + shared.POLL_S
+                if idle >= 15:
+                    yield ": keepalive\n\n"
+                    idle = 0.0
+                await asyncio.sleep(shared.POLL_S)
+        return StreamingResponse(relay(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     async def stream():
         q = deal.listen()
@@ -184,54 +214,69 @@ async def deal_events(deal_id: str):
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+async def _apply(deal, a: dict):
+    """Apply one human action to a deal running on this instance."""
+    kind = a["action"]
+    if kind == "approve":
+        return deal.approve()
+    if kind == "exception":
+        deal.resolve_exception(bool(a.get("accept")))
+        return {"ok": True}
+    if kind == "return":
+        target = getattr(deal, "winner", None) or deal
+        target.on_return = _remember_return
+        await deal.start_return(a.get("reason") or "They're uncomfortable after an hour")
+        return {"ok": True}
+    if kind == "return_approve":
+        return deal.approve_return()
+    if kind == "dropoff":
+        return deal.choose_dropoff(str(a.get("location_id", "")))
+    if kind == "dropped":
+        deal.mark_dropped()
+        return {"ok": True}
+    raise ValueError(f"unknown action {kind}")
+
+
+async def _act(deal_id: str, action: str, **data):
+    """Run locally if this instance owns the deal; otherwise queue it for the owner (serverless)."""
+    deal = store.deals.get(deal_id)
+    try:
+        if deal is not None:
+            return await _apply(deal, {"action": action, **data})
+        if shared.enabled() and await shared.exists(deal_id):
+            await shared.queue_action(deal_id, action, **data)
+            return {"ok": True, "queued": True}
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    raise HTTPException(404, "Unknown deal")
+
+
 @app.post("/api/deals/{deal_id}/exception")
 async def answer_exception(deal_id: str, body: dict):
     """The human answers an over-budget offer their agent escalated: {"accept": true|false}."""
-    try:
-        _get(deal_id).resolve_exception(bool(body.get("accept")))
-    except ValueError as e:
-        raise HTTPException(409, str(e))
-    return {"ok": True}
+    return await _act(deal_id, "exception", accept=bool(body.get("accept")))
 
 
 @app.post("/api/deals/{deal_id}/return")
 async def start_return(deal_id: str, body: dict):
     """Post-purchase: the human asks their agent to return the order. {"reason": "..."}"""
-    deal = _get(deal_id)
-    reason = str(body.get("reason") or "They're uncomfortable after an hour").strip()
-    target = getattr(deal, "winner", None) or deal
-    target.on_return = _remember_return
-    try:
-        await deal.start_return(reason)
-    except ValueError as e:
-        raise HTTPException(409, str(e))
-    return {"ok": True}
+    return await _act(deal_id, "return", reason=str(body.get("reason") or "").strip())
 
 
 @app.post("/api/deals/{deal_id}/return/approve")
 async def approve_return(deal_id: str):
-    try:
-        return _get(deal_id).approve_return()
-    except ValueError as e:
-        raise HTTPException(409, str(e))
+    return await _act(deal_id, "return_approve")
 
 
 @app.post("/api/deals/{deal_id}/return/dropoff")
 async def return_dropoff(deal_id: str, body: dict):
-    """The human picks a drop-off location; returns the carrier label (simulated)."""
-    try:
-        return _get(deal_id).choose_dropoff(str(body.get("location_id", "")))
-    except ValueError as e:
-        raise HTTPException(409, str(e))
+    """The human picks a drop-off location; the carrier label arrives as an event (simulated)."""
+    return await _act(deal_id, "dropoff", location_id=str(body.get("location_id", "")))
 
 
 @app.post("/api/deals/{deal_id}/return/dropped")
 async def return_dropped(deal_id: str):
-    try:
-        _get(deal_id).mark_dropped()
-    except ValueError as e:
-        raise HTTPException(409, str(e))
-    return {"ok": True}
+    return await _act(deal_id, "dropped")
 
 
 async def _remember_return(deal) -> None:
@@ -246,7 +291,4 @@ async def _remember_return(deal) -> None:
 
 @app.post("/api/deals/{deal_id}/approve")
 async def approve(deal_id: str):  # async: Deal.approve schedules BAND events on the running loop
-    try:
-        return _get(deal_id).approve()
-    except ValueError as e:
-        raise HTTPException(409, str(e))
+    return await _act(deal_id, "approve")

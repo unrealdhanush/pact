@@ -283,9 +283,42 @@ class Intake:
         }
 
 
+def intake_state(it: "Intake") -> dict:
+    """Serializable intake (for cross-instance persistence); the Moss session isn't carried over."""
+    return {"id": it.id, "turns": it.turns, "product": it.product, "options": it.options, "recalled": it.recalled,
+            "confirmed": it.confirmed, "timings": it.timings, "fields": {k: b.as_dict() for k, b in it.fields.items()}}
+
+
+def intake_from_state(d: dict) -> "Intake":
+    it = Intake(id=d["id"], turns=d["turns"], product=d["product"], options=d["options"], recalled=d["recalled"],
+                confirmed=d["confirmed"], timings=d["timings"])
+    for k, b in d["fields"].items():
+        v = b["value"]
+        if k == "delivery_deadline" and isinstance(v, str):
+            v = date.fromisoformat(v)
+        it.fields[k] = Boundary(v, b["source"], b.get("memory_id"), b.get("memory_text"))
+    return it
+
+
 class IntakeStore:
     def __init__(self):
         self.items: dict[str, Intake] = {}
+
+    async def get(self, intake_id: str | None) -> "Intake | None":
+        """Local intake, or one persisted by another serverless instance."""
+        if not intake_id:
+            return None
+        if intake_id in self.items:
+            return self.items[intake_id]
+        from . import shared
+        d = await shared.load_intake(intake_id)
+        if d:
+            self.items[intake_id] = intake_from_state(d)
+        return self.items.get(intake_id)
+
+    async def save(self, it: "Intake") -> None:
+        from . import shared
+        await shared.save_intake(it.id, intake_state(it))
 
     def get_or_new(self, intake_id: str | None) -> Intake:
         if intake_id and intake_id in self.items:
